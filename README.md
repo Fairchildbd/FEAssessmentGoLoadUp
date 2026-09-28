@@ -2,7 +2,7 @@
 
 A pet-sitting booking app built as a monorepo: a **React** web app and a **React Native** app that share one TypeScript package for design tokens, domain types, the mock database and form logic. It is front end only; there is no backend in this repo.
 
-> **Status:** boilerplate. The monorepo, shared package, themes, mock database, test tooling and the shared booking-form logic (React Hook Form, with date and time) are set up and verified. The form UI, pricing engine, mock API and admin pages are next (see [Next steps](#next-steps)).
+> **Status:** the web booking form works: several pets per request, a click-only date picker, a start-to-end time picker that only offers 2 to 8 hours in half-hour steps, all-client-side validation and a live itemized price. Submitting doesn't save anything yet. The mock API, overlap checks, admin pages and the mobile screens are next (see [Next steps](#next-steps)).
 
 ## Quick start
 
@@ -30,9 +30,11 @@ shared/                  @pet-sitting/shared: platform-agnostic code used by bot
   src/design-tokens/     designTokens.ts: colors, spacing, radius, type scale
   src/domain/            bookingDomain.ts: data types and business rules
   src/mock-database/     mockDatabase.ts: the mock backend's data, plus tests for the seed
+  src/pricing/           pricingEngine.ts: the itemized quote, plus its tests
 web/                     @pet-sitting/web: React, Vite, MUI, Tailwind
   src/WebApp.tsx         root component: MUI theme and providers
   src/pages/             Web*Page.tsx
+  src/booking-form/      the booking form's inputs and price summary (Web*Field.tsx, WebPriceSummary.tsx)
   src/theme/             webTheme.ts (MUI), tailwind.css
   tailwind.config.ts     Tailwind theme built from the shared tokens
   e2e/                   Playwright tests
@@ -63,10 +65,21 @@ shared/src/booking-form/bookingFormSchema.ts     zod schema: every field rule, i
 
 - **One hook, two UIs.** React Hook Form's core doesn't depend on the DOM, so `useBookingForm()` lives in `shared/` and returns the usual `useForm` object (`control`, `handleSubmit`, `formState`, ...). Each app binds its own inputs with `<Controller />`: React Native has no DOM inputs for `register`, and MUI's selects and pickers are controlled components too.
 - **One schema for the apps and the mock API.** The rules are a zod schema, connected with `zodResolver`. The mock API can parse requests with the same schema, so it re-checks exactly what the apps check.
-- **Two types.** `BookingFormValues` is what the form holds while someone edits it (`animalType` can be `null`). `BookingRequest` is what `handleSubmit` receives once the form is valid (names trimmed, an animal chosen).
-- **When errors show.** With `mode: 'onTouched'`, a field is checked when the user leaves it, then on every change. A start time's validity also depends on the date and the number of hours, so the hook re-checks it when either changes.
-- **Date and time.** The form holds `serviceDate` (`'YYYY-MM-DD'`) and `startTime` (`'HH:mm'`) as strings. All date and time work uses [date-fns](https://date-fns.org/), which runs the same on web and React Native. Pickers return `Date` objects: store them with `format(date, DATE_FORMAT)` or `format(date, TIME_FORMAT)`, and read the strings back with `parse`. The format constants come from `@pet-sitting/shared/date-time`.
+- **Two types.** `BookingFormValues` is what the form holds while someone edits it (a pet's `animalType` can be `null`). `BookingRequest` is what `handleSubmit` receives once the form is valid (names trimmed, every animal chosen).
+- **Several pets per request.** `pets` is an array handled with React Hook Form's `useFieldArray`, which `useBookingForm()` returns as `pets`. All the pets share one date and time. Listing the same pet (name + animal type) twice is an error.
+- **When errors show.** With `mode: 'onTouched'`, a field is checked when the user leaves it, then on every change. Closing a picker counts as leaving it. Submit stays disabled until every input is filled in and valid (`formState.isValid`, which checks the whole schema on every change). Whether a start time has passed depends on the date, so the hook re-checks the time when the date changes.
+- **Date and time: two inputs.** The form holds `serviceDate` (`'YYYY-MM-DD'`) and `serviceTime` (`{ startTime, endTime }`, each `'HH:mm'`) as strings. There's no hours field: the hours come from the start and end time (`hoursBetween`), and the schema checks the 2 hour minimum and 8 hour maximum on `serviceTime`.
+- **Web pickers.** The date uses MUI X's `DatePicker` with its field set to read-only, so there's no typing, and clicking anywhere on it opens the calendar. MUI X's time-range picker is a paid (Pro) component, so `WebServiceTimeField` is a read-only `TextField` that opens a popover with a Start column (every half hour) and an End column that lists only the times 2 to 8 hours after the start, every half hour, stopping at closing. So a length outside the limits can't be picked; the schema's 2 and 8 hour errors are a safety net. All date and time work uses [date-fns](https://date-fns.org/), which runs the same on web and React Native. Pickers return `Date` objects: store them with `format(date, DATE_FORMAT)` or `format(date, TIME_FORMAT)`, and read the strings back with `parse`. The format constants come from `@pet-sitting/shared/date-time`.
 - **Import date-fns one function at a time** (`import { format } from 'date-fns/format'`). Metro doesn't tree-shake: a single `import { format } from 'date-fns'` added 215 modules and about 200 KB to the iOS bundle. ESLint blocks the root import.
+
+## Pricing
+
+`shared/src/pricing/pricingEngine.ts` turns the pets and the hours into an itemized quote, in integer cents, from the `pricingRules` rate card. `useBookingQuote()` in `shared/` keeps it live as pets and times change.
+
+- **The $20 base charge is per request, not per pet.** One pet or twenty, it's charged once.
+- **Each pet is itemized, not written as an equation**: its hours and its hourly rate on separate lines under its name, with its subtotal beside it.
+- **The total always shows a price.** Until a time is picked it's the base charge alone, and each pet reads "Choose a time"; the pets are added as soon as there's a time.
+- For now the web page reads the rate card straight from the mock database. Fetching it through a mock API is a next step.
 
 ## Styling: shared tokens, platform themes
 
@@ -112,7 +125,7 @@ Where the assessment is silent, these are the working assumptions. The data mode
 
 1. **No double-booking a pet.** A pet can have several bookings on one date, but its confirmed bookings can't overlap: the pet is returned before its next booking starts. Back-to-back is fine (11:00–13:00 can follow 09:00–11:00), with no buffer in between. Only the mock API can check this, because it needs the existing bookings; date-fns `areIntervalsOverlapping` does the comparison.
 2. **Service hours are 07:00–21:00** local time. A booking must start and end inside them, so it never runs past midnight, and it starts on the hour or half hour.
-3. **Whole hours only**, from 2 to 8.
+3. **Half-hour steps**: bookings start and end on the hour or half hour, and last from 2 to 8 hours (2, 2.5, ... 8).
 4. **Dates and times are local to where the pet is.** They're stored as strings (`'YYYY-MM-DD'`, `'HH:mm'`) with that place's IANA time zone beside them, which is what turns them into an exact moment. A booking must start in the future: later today is fine. "Now" comes from the device's clock and time zone, assuming people book from where the pet is. Date strings are read with date-fns `parse`, never `new Date()`, which parses them as UTC midnight: the previous evening in US time zones.
 5. **Identity without accounts.** The same first + last name (trimmed, case-insensitive) is the same customer, and a customer's pet is identified by name + animal type. In production these would be signed-in user and pet ids.
 6. **Names are 1–50 characters** after trimming.
@@ -125,21 +138,25 @@ Where the assessment is silent, these are the working assumptions. The data mode
 
 | Layer | Tool           | Where                      | Covers now                                                                                                                                                                                                  |
 | ----- | -------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Unit  | Vitest         | `shared/src/**/*.test.ts`  | The booking form's rules (against a fixed clock), the strict date and time format checks, and the mock database seed (2 of each animal, valid references, no double-booked pets). The pricing engine's tests go here. |
-| E2E   | Playwright     | `web/e2e/`                 | Smoke test: tokens reach MUI and Tailwind, a Tailwind class overrides MUI, and React Hook Form runs. The browser's time zone is fixed to `America/New_York`. Booking form and admin page tests go here.     |
+| Unit  | Vitest         | `shared/src/**/*.test.ts`  | The booking form's rules (against a fixed clock), the pricing engine (base charge once per request), the strict date and time format checks, and the mock database seed (2 of each animal, valid references, no double-booked pets). |
+| E2E   | Playwright     | `web/e2e/`                 | The booking form: the date opens from anywhere on the field and can't be typed in, the End column offers only 2 to 8 hours in half-hour steps and stops at closing, submit stays disabled until every input is filled in, the total for several pets charges the base once, and a complete request submits. The browser's time zone and clock are fixed, and reduced motion is on (the date picker ignores clicks during its opening animation, which only a test is fast enough to make). Admin page tests go here. |
 | CI    | GitHub Actions | `.github/workflows/ci.yml` | `npm run verify` plus the E2E tests on every push to `main` and every pull request.                                                                                                                        |
 
 The mobile app is checked by the TypeScript typecheck, `npx expo-doctor` and an iOS bundle, and the starter screen has been run in the iOS Simulator.
 
 ## Next steps
 
-- [ ] Pricing engine in `shared/`, with unit tests
+- [x] Pricing engine in `shared/`, with unit tests
 - [ ] Mock API client in `shared/`: async calls with simulated latency against a copy of the mock database (quote, create booking, list bookings). Creating a booking should re-check the request with `bookingFormSchema`, reject a pet's overlapping bookings, and record `timeZone` from `getDeviceTimeZone()`
-- [ ] Finish `useBookingForm`: a debounced live quote, and submit
-- [ ] Web: routing, `WebBookingPage` (MUI inputs with `<Controller />`, including date and time pickers) and `WebAdminPage`
+- [x] Live quote in `useBookingForm` (`useBookingQuote`)
+- [ ] Submit: send the request through the mock API, and handle overlapping bookings for each pet
+- [x] Web: `WebBookingPage` (MUI inputs with `<Controller />`, including date and time pickers)
+- [ ] Web: routing and `WebAdminPage`
 - [ ] Mobile: navigation, `MobileBookingScreen` (Paper inputs with `<Controller />`, including date and time pickers) and `MobileAdminScreen`
-- [ ] E2E tests for the booking form and admin page
-- [ ] Delete the starter page, starter screen and smoke test
+- [x] E2E tests for the booking form
+- [ ] E2E tests for the admin page
+- [x] Delete the web starter page and smoke test
+- [ ] Delete the mobile starter screen
 
 ## AI usage
 
@@ -147,7 +164,7 @@ The assessment allows AI tools as long as their use is documented. Every prompt 
 
 | Tool                                       | What it helped with                                                                                                                                  |
 | ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Claude Code (desktop app, Claude Opus 5.5) | Researching the role and assessment, the monorepo boilerplate, the shared booking-form logic (React Hook Form, validation, dates and times), and drafting this README. |
+| Claude Code (desktop app, Claude Opus 5.5) | Researching the role and assessment, the monorepo boilerplate, the shared booking-form logic (React Hook Form, validation, dates and times), the web booking form and pricing engine with their tests, and drafting this README. |
 
 **Decisions I made** (from my prompts):
 
@@ -158,10 +175,13 @@ The assessment allows AI tools as long as their use is documented. Every prompt 
 - Account for the same-day booking gotcha, and seed 2 of each animal (Prompt 1)
 - React Hook Form for the booking form (Prompt 2)
 - Bookings have a start time as well as a date (Prompt 2)
+- Several pets on one request; exactly two inputs for when (a click-only date picker, and one time input for start and end, holding the 2 to 8 hour limits); submit disabled with a matching error outside 2 to 8 hours; the $20 base charged once per request; each pet's charges itemized rather than written as an equation; validation entirely on the front end (Prompt 4)
+- End times limited to 2 to 8 hours after the start, so a wrong length can't be picked; start and end times every 30 minutes; the total always shows a price; submit disabled until every input is filled in (Prompt 5)
 
 **Corrections I made to AI output:**
 
 - Replaced the AI's hand-written date and time helpers with date-fns (Prompt 3)
+- Replaced the AI's time picker, which listed every length and relied on errors, with one that only offers valid lengths; and asked for half-hour end times instead of whole hours (Prompt 5)
 
 ## Prompts
 
@@ -266,3 +286,75 @@ A correction to the AI's work from Prompt 2: replace its hand-written date and t
 - Measured the cost of importing from `'date-fns'` in the mobile app: one such import added 215 modules and about 200 KB to the iOS bundle, because Metro doesn't tree-shake. Every import now uses the function's own path (`'date-fns/format'`), and a new ESLint rule blocks the root import in all three packages.
 - Made the starter page and screen show today's date through date-fns. The E2E test fixes the browser clock with `page.clock` (along with the time zone), which is the pattern for testing date rules.
 - Ran all checks, all passing: typecheck, lint, format check, 20 unit tests, the web build, the E2E test, `expo-doctor` (21/21), and the mobile starter in the iOS Simulator (date-fns works on Hermes).
+
+### Prompt 4: The web booking form
+
+- **Tool:** Claude Code (desktop app), Claude Opus 5.5
+- **Date:** 2026-09-28
+- **Files written:** `shared/src/booking-form/` (schema, hook and tests reworked for several pets and a time range), `shared/src/pricing/` (new), `shared/src/date-time/localDateTime.ts` and its test, `shared/src/domain/bookingDomain.ts` (animal labels), `web/src/booking-form/` (new), `web/src/pages/WebBookingPage.tsx` (new, replacing the starter page), `web/src/WebApp.tsx`, `web/e2e/webBookingPage.spec.ts` (new, replacing the smoke test), the mobile starter screen (one line), the `package.json` files and this README
+
+_Verbatim.
+
+> I need you to only create the web form in this repo. Here are the requirements:
+> https://docs.google.com/document/d/1AbCMEyZ80FQdf0d1XPsVmPmjyc0TG4F0E45IU0yOGwQ/edit?tab=t.0
+>
+> Please try to keep backend changes to a minimum. This is a front end only test, so I want
+> validation to be completely on the front end. Do not worry about overlapping edge cases after
+> submitting the form. That will be handled next.
+>
+> There are a few things in the requirements that are a gotcha and are not blatantly spelled out:
+>
+> Multiple pets on one form. The document says to include the animal name and animal type.
+> Assume a user has two dogs, named Oscar and Sulley. The user should be able to add multiple pets to the same form.
+> Date and time are two inputs only: one for the date and one for the time.
+> Date: clicking anywhere on the date field (the date text OR the calendar icon) should open the date picker. The user should not be able to type into the field from the keyboard.
+> Time: the 2-hour minimum and 8-hour maximum are handled within the time picker itself (the user picks a start and end time in that one input), not as a separate hours input alongside a separate start-time input.
+> If the user selects anything over 8 hours, disable the submit button and show an error. Ifvthe user selects anything under 2 hours, disable the submit button and show the correct
+> error message.
+> Total pay. Show a total pay at the bottom of the page that updates whenever a pet is added.
+> The $20 base pay is not per animal. It is charged once per sitter request, so whether the
+> user has 1 animal or 20, they are only charged $20 once.
+> The breakdown under each animal's name should not be a math equation. Simply itemize the
+> charges, for example:
+> 8 hours
+> $20 per hour
+
+#### Use Case
+
+Build the web booking form, front end only, and handle the requirements that the assessment doesn't spell out: several pets on one request, exactly two inputs for when (a date picker that can't be typed in, and one time input that covers start and end and holds the 2 to 8 hour limits), submit disabled with the right error outside those limits, and a live total that charges the $20 base once per request and itemizes each pet. Overlapping bookings after submit are left for the next prompt.
+
+#### What the AI did
+
+- Reworked the shared schema and hook: `pets` became an array (React Hook Form `useFieldArray`, with a duplicate-pet check), and `hoursRequested` + `startTime` became one `serviceTime` field (`{ startTime, endTime }`) whose hours come from the two times. Its errors are checked in order and only the first shows: missing, format, half-hour start, service hours, end before start, under 2 hours, over 8 hours, whole hours. Added `hoursBetween` (date-fns `differenceInMinutes`) to `localDateTime.ts`.
+- Added the pricing engine in `shared/src/pricing/` (base charge once per request, each pet at its animal's hourly rate, integer cents) with unit tests, and `useBookingQuote()`, which gives no price until the time covers 2 to 8 whole hours. For now the page reads the rate card straight from the mock database; there is no mock API call.
+- Installed `@mui/x-date-pickers` (it was on disk but not in `package.json`) and `@mui/icons-material` in `web/`, and built `WebBookingPage` from four components in `web/src/booking-form/`: the date field, the time-range field, the pet rows and the price summary.
+- **Date field:** found that a read-only MUI X field cancels its own click, so it opens the calendar on mousedown (plus Enter and Space for keyboard users).
+- **Time field:** MUI X's time-range picker is a paid (Pro) component, so this is a read-only `TextField` that opens a popover with Start and End columns. Changing the start keeps the same number of hours when they still fit. Start times that have already passed today are disabled.
+- Replaced the starter page and smoke test with 4 E2E tests. Found that the date picker ignores a click made during its opening animation (stock MUI behavior, only reachable at test speed), so the tests run with reduced motion.
+- Changed one line of the mobile starter screen, which read the removed `hoursRequested` field. The mobile booking screen is not built.
+- Ran all checks, all passing: typecheck, lint, format check, 28 unit tests, the web build and the 4 E2E tests. Checked the page in screenshots at desktop and phone widths, which showed a price for an invalid 9-hour booking; changed the quote to wait for a valid time.
+
+### Prompt 5: Only valid times, and submit only when complete
+
+- **Tool:** Claude Code (desktop app), Claude Opus 5.5
+- **Date:** 2026-09-28
+- **Files written:** `shared/src/booking-form/` (schema, hook and schema tests), `shared/src/pricing/` (engine and tests), `shared/src/domain/bookingDomain.ts`, `shared/src/mock-database/mockDatabase.test.ts`, `web/src/booking-form/WebServiceTimeField.tsx`, `web/src/booking-form/WebPriceSummary.tsx`, `web/src/pages/WebBookingPage.tsx`, `web/e2e/webBookingPage.spec.ts` and this README
+
+_Verbatim._
+
+> The end times should filter out any hours that are outside of the 2 to 8 hours away from the start time, so the user cannot select under 2 hours or over 8 hours. The start times and end times should be in increments of 30 minutes. This should allow you to remove the dash for the total, as the user should not be able to select outside of the 2 to 8 hour window.
+>
+> Submission should be disabled until all of the inputs in the form are filled out.
+
+#### Use Case
+
+A correction to Prompt 4's time picker: instead of listing every length and showing an error for the wrong ones, only offer end times 2 to 8 hours after the start, every 30 minutes. With no invalid lengths to price, the total no longer needs a dash. Also, submit stays disabled until the whole form is filled in.
+
+#### What the AI did
+
+- **Time picker:** the End column now lists every half hour from 2 to 8 hours after the start, stopping at closing (9:00 PM), and the Start column stops at 7:00 PM, the last start that leaves 2 hours. A new E2E test found that starts from 4:00 PM on had no end times at all: start + 8 hours wrapped past midnight (6:00 PM + 8 hours became `'02:00'`), and the code compared the times as strings. It now compares them as dates.
+- **Half hours:** `startTimeStepMinutes` became `timeStepMinutes` and applies to end times too, the schema dropped "Choose whole hours" and checks that both times are on the hour or half hour, and the pricing engine prices half hours (rounded to whole cents). Kept the schema's 2 and 8 hour errors as a safety net for data that doesn't come from the picker.
+- **Total:** always a price. The pricing engine takes `hours: null` before a time is picked, which leaves every pet unpriced, so the total is the $20 base; each pet shows "Choose a time" and no subtotal until then.
+- **Submit:** disabled while `formState.isValid` is false, so any empty or invalid input (including a new, empty pet row) keeps it disabled. Error messages still wait until the user leaves a field.
+- Rewrote the time and submit E2E tests (now 5), and added unit tests for half-hour prices, the base-only total, and end times off the half hour.
+- Ran all checks, all passing: typecheck, lint, format check, 30 unit tests, the web build and the 5 E2E tests.

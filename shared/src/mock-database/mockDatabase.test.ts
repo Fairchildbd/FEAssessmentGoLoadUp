@@ -38,16 +38,16 @@ describe('mockDatabase seed', () => {
     }
   });
 
-  it('books whole hours within the allowed range', () => {
+  it('books half-hour steps within the allowed range', () => {
     for (const { id, hoursRequested } of bookings) {
-      expect(Number.isInteger(hoursRequested), id).toBe(true);
+      expect((hoursRequested * 60) % BOOKING_RULES.timeStepMinutes, id).toBe(0);
       expect(hoursRequested, id).toBeGreaterThanOrEqual(BOOKING_RULES.minHours);
       expect(hoursRequested, id).toBeLessThanOrEqual(BOOKING_RULES.maxHours);
     }
   });
 
   it('schedules every booking inside service hours, starting on the hour or half hour', () => {
-    const { serviceHours, startTimeStepMinutes } = BOOKING_RULES;
+    const { serviceHours, timeStepMinutes } = BOOKING_RULES;
 
     for (const booking of bookings) {
       const { start, end } = slotOf(booking);
@@ -59,7 +59,7 @@ describe('mockDatabase seed', () => {
         booking.endTime,
       );
       expect(isBefore(start, opening) || isAfter(end, closing), booking.id).toBe(false);
-      expect(getMinutes(start) % startTimeStepMinutes, booking.id).toBe(0);
+      expect(getMinutes(start) % timeStepMinutes, booking.id).toBe(0);
       // Intl throws a RangeError for a time zone name it doesn't know.
       expect(() => new Intl.DateTimeFormat('en-US', { timeZone: booking.timeZone })).not.toThrow();
     }

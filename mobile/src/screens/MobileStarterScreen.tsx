@@ -16,7 +16,7 @@ const { color, radius, spacing, typography } = designTokens;
  */
 export function MobileStarterScreen() {
   const { control } = useBookingForm();
-  const hoursRequested = useWatch({ control, name: 'hoursRequested' });
+  const pets = useWatch({ control, name: 'pets' });
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -34,7 +34,7 @@ export function MobileStarterScreen() {
           <Text>
             Mock database: {mockDatabase.pets.length} pets, {mockDatabase.bookings.length} bookings
           </Text>
-          <Text>useBookingForm() (React Hook Form): hours start at {hoursRequested}</Text>
+          <Text>useBookingForm() (React Hook Form): starts with {pets.length} pet</Text>
           <Text>
             date-fns: today is {format(new Date(), DATE_FORMAT)} in {getDeviceTimeZone()}
           </Text>

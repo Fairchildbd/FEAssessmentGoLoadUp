@@ -1,6 +1,8 @@
 import CssBaseline from '@mui/material/CssBaseline';
 import { StyledEngineProvider, ThemeProvider } from '@mui/material/styles';
-import { WebStarterPage } from './pages/WebStarterPage';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { WebBookingPage } from './pages/WebBookingPage';
 import { webTheme } from './theme/webTheme';
 
 /**
@@ -14,7 +16,10 @@ export function WebApp() {
     <StyledEngineProvider enableCssLayer>
       <ThemeProvider theme={webTheme}>
         <CssBaseline />
-        <WebStarterPage />
+        {/* Date pickers work in date-fns Dates, like the rest of the repo. */}
+        <LocalizationProvider dateAdapter={AdapterDateFns}>
+          <WebBookingPage />
+        </LocalizationProvider>
       </ThemeProvider>
     </StyledEngineProvider>
   );

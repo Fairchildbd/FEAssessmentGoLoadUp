@@ -14,61 +14,80 @@ afterEach(() => {
 const validValues: BookingFormValues = {
   firstName: 'Jordan',
   lastName: 'Rivera',
-  animalName: 'Biscuit',
-  animalType: 'dog',
-  hoursRequested: 2,
+  pets: [
+    { name: 'Oscar', animalType: 'dog' },
+    { name: 'Sulley', animalType: 'dog' },
+  ],
   serviceDate: '2026-10-03',
-  startTime: '09:00',
+  serviceTime: { startTime: '09:00', endTime: '17:00' },
 };
 
-/** The first error message for each field, which is what React Hook Form shows. */
+const at = (startTime: string, endTime: string): BookingFormValues => ({
+  ...validValues,
+  serviceTime: { startTime, endTime },
+});
+
+/** The first error message for each field path, which is what React Hook Form shows. */
 function errorsFor(values: BookingFormValues): Record<string, string> {
   const result = bookingFormSchema.safeParse(values);
   const errors: Record<string, string> = {};
   for (const issue of result.error?.issues ?? []) {
-    errors[String(issue.path[0])] ??= issue.message;
+    errors[issue.path.join('.')] ??= issue.message;
   }
   return errors;
 }
 
 describe('bookingFormSchema', () => {
-  it('accepts a complete booking and trims the names', () => {
-    const booking = bookingFormSchema.parse({ ...validValues, firstName: '  Jordan ' });
+  it('accepts several pets on one request and trims the names', () => {
+    const booking = bookingFormSchema.parse({
+      ...validValues,
+      firstName: '  Jordan ',
+      pets: [{ name: ' Oscar ', animalType: 'dog' }, ...validValues.pets.slice(1)],
+    });
 
     expect(booking.firstName).toBe('Jordan');
+    expect(booking.pets.map((pet) => pet.name)).toEqual(['Oscar', 'Sulley']);
   });
 
   it('requires every field', () => {
     const emptyForm: BookingFormValues = {
-      ...validValues,
       firstName: '',
       lastName: ' ',
-      animalName: '',
-      animalType: null,
+      pets: [{ name: '', animalType: null }],
       serviceDate: '',
-      startTime: '',
+      serviceTime: { startTime: '', endTime: '' },
     };
 
     expect(errorsFor(emptyForm)).toEqual({
       firstName: 'Enter your first name',
       lastName: 'Enter your last name',
-      animalName: "Enter your pet's name",
-      animalType: 'Choose an animal type',
+      'pets.0.name': "Enter your pet's name",
+      'pets.0.animalType': 'Choose an animal type',
       serviceDate: 'Choose a date',
-      startTime: 'Choose a start time',
+      serviceTime: 'Choose a start and end time',
     });
   });
 
-  it('only allows whole hours from 2 to 8', () => {
-    expect(errorsFor({ ...validValues, hoursRequested: 1 })).toEqual({
-      hoursRequested: 'Book at least 2 hours',
-    });
-    expect(errorsFor({ ...validValues, hoursRequested: 9 })).toEqual({
-      hoursRequested: 'Book at most 8 hours',
-    });
-    expect(errorsFor({ ...validValues, hoursRequested: 2.5 })).toEqual({
-      hoursRequested: 'Choose whole hours',
-    });
+  it('needs at least one pet, and each pet only once', () => {
+    expect(errorsFor({ ...validValues, pets: [] })).toEqual({ pets: 'Add a pet' });
+    expect(
+      errorsFor({
+        ...validValues,
+        pets: [
+          { name: 'Oscar', animalType: 'dog' },
+          { name: 'oscar ', animalType: 'dog' },
+          { name: 'Oscar', animalType: 'cat' },
+        ],
+      }),
+    ).toEqual({ 'pets.1.name': 'oscar is already on this request' });
+  });
+
+  it('books from 2 to 8 hours, set by the start and end time', () => {
+    expect(errorsFor(at('09:00', '11:00'))).toEqual({});
+    expect(errorsFor(at('09:00', '10:00'))).toEqual({ serviceTime: 'Book at least 2 hours' });
+    expect(errorsFor(at('09:00', '18:00'))).toEqual({ serviceTime: 'Book at most 8 hours' });
+    expect(errorsFor(at('09:00', '11:30'))).toEqual({}); // half hours are fine
+    expect(errorsFor(at('12:00', '09:00'))).toEqual({ serviceTime: 'End after the start time' });
   });
 
   it('rejects impossible and past dates', () => {
@@ -80,35 +99,43 @@ describe('bookingFormSchema', () => {
     });
   });
 
-  it('starts bookings on the hour or half hour', () => {
-    expect(errorsFor({ ...validValues, startTime: '09:15' })).toEqual({
-      startTime: 'Start on the hour or half hour',
+  it('starts and ends on the hour or half hour, inside service hours', () => {
+    expect(errorsFor(at('09:15', '11:15'))).toEqual({
+      serviceTime: 'Choose times on the hour or half hour',
     });
-  });
-
-  it('keeps the whole booking inside service hours', () => {
-    expect(errorsFor({ ...validValues, startTime: '06:30' })).toEqual({
-      startTime: 'For 2 hours, start between 07:00 and 19:00',
+    expect(errorsFor(at('09:00', '11:45'))).toEqual({
+      serviceTime: 'Choose times on the hour or half hour',
     });
-    expect(errorsFor({ ...validValues, hoursRequested: 8, startTime: '13:30' })).toEqual({
-      startTime: 'For 8 hours, start between 07:00 and 13:00',
+    expect(errorsFor(at('06:30', '08:30'))).toEqual({
+      serviceTime: 'Book between 07:00 and 21:00',
     });
-    expect(errorsFor({ ...validValues, hoursRequested: 8, startTime: '13:00' })).toEqual({});
+    expect(errorsFor(at('19:30', '21:30'))).toEqual({
+      serviceTime: 'Book between 07:00 and 21:00',
+    });
+    expect(errorsFor(at('13:00', '21:00'))).toEqual({});
   });
 
   it('rejects a start time that has already passed today', () => {
-    expect(errorsFor({ ...validValues, serviceDate: '2026-10-01', startTime: '11:30' })).toEqual({
-      startTime: 'That time has already passed',
+    const today = { ...validValues, serviceDate: '2026-10-01' };
+    expect(errorsFor({ ...today, serviceTime: { startTime: '11:30', endTime: '13:30' } })).toEqual({
+      serviceTime: 'That start time has already passed',
     });
-    expect(errorsFor({ ...validValues, serviceDate: '2026-10-01', startTime: '12:30' })).toEqual(
+    expect(errorsFor({ ...today, serviceTime: { startTime: '12:30', endTime: '14:30' } })).toEqual(
       {},
     );
   });
 
   it('checks the schedule even while other fields are still empty', () => {
-    expect(errorsFor({ ...validValues, firstName: '', startTime: '20:00' })).toEqual({
+    expect(
+      errorsFor({
+        ...validValues,
+        firstName: '',
+        serviceDate: '2026-10-01',
+        serviceTime: { startTime: '09:00', endTime: '11:00' },
+      }),
+    ).toEqual({
       firstName: 'Enter your first name',
-      startTime: 'For 2 hours, start between 07:00 and 19:00',
+      serviceTime: 'That start time has already passed',
     });
   });
 });

@@ -1,3 +1,4 @@
+import { differenceInMinutes } from 'date-fns/differenceInMinutes';
 import { format } from 'date-fns/format';
 import { isValid } from 'date-fns/isValid';
 import { parse } from 'date-fns/parse';
@@ -19,6 +20,20 @@ export const TIME_FORMAT = 'HH:mm';
 /** A booking's local date and time as a Date, e.g. parseDateTime('2026-10-03', '09:30'). */
 export function parseDateTime(date: string, time: string): Date {
   return parse(`${date} ${time}`, `${DATE_FORMAT} ${TIME_FORMAT}`, new Date());
+}
+
+/**
+ * Hours from one 'HH:mm' time to a later one on the same day, e.g. hoursBetween('09:00', '17:00')
+ * is 8. Half hours come back as fractions (2.5), and an invalid time as NaN.
+ */
+export function hoursBetween(startTime: string, endTime: string): number {
+  const referenceDate = new Date();
+  return (
+    differenceInMinutes(
+      parse(endTime, TIME_FORMAT, referenceDate),
+      parse(startTime, TIME_FORMAT, referenceDate),
+    ) / 60
+  );
 }
 
 /**

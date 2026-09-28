@@ -1,23 +1,27 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { BOOKING_RULES } from '../domain/bookingDomain';
+import { useFieldArray, useForm, useWatch, type Control } from 'react-hook-form';
+import { hoursBetween } from '../date-time/localDateTime';
+import type { PricingRules } from '../domain/bookingDomain';
+import { quoteBooking, type BookingQuote } from '../pricing/pricingEngine';
 import {
   bookingFormSchema,
   type BookingFormValues,
   type BookingRequest,
+  type PetFormValues,
 } from './bookingFormSchema';
 
-export type { BookingFormValues, BookingRequest };
+export type { BookingFormValues, BookingRequest, PetFormValues };
+
+/** A new, empty pet row. No animal type is selected, so no one books the wrong animal by default. */
+export const emptyPet: PetFormValues = { name: '', animalType: null };
 
 export const bookingFormDefaultValues: BookingFormValues = {
   firstName: '',
   lastName: '',
-  animalName: '',
-  animalType: null, // nothing selected yet, so no one books the wrong animal by default
-  hoursRequested: BOOKING_RULES.minHours,
+  pets: [emptyPet],
   serviceDate: '',
-  startTime: '',
+  serviceTime: { startTime: '', endTime: '' },
 };
 
 export function useBookingForm() {
@@ -27,23 +31,41 @@ export function useBookingForm() {
     // Check a field when the user leaves it, then on every change after that.
     mode: 'onTouched',
   });
-  const { subscribe, getFieldState, trigger } = form;
+  const { control, subscribe, getFieldState, trigger } = form;
 
-  // Whether a start time is valid also depends on the date and the number of hours, so check it
-  // again when either one changes (once the user has touched the start time).
+  // Several pets on one request: Oscar and Sulley share the date and time.
+  const pets = useFieldArray({ control, name: 'pets' });
+
+  // A start time can pass depending on the date (today vs. tomorrow), so check the time again when
+  // the date changes (once the user has touched the time).
   useEffect(
     () =>
       subscribe({
-        name: ['serviceDate', 'hoursRequested'],
+        name: 'serviceDate',
         formState: { values: true },
         callback: () => {
-          if (getFieldState('startTime').isTouched) void trigger('startTime');
+          if (getFieldState('serviceTime').isTouched) void trigger('serviceTime');
         },
       }),
     [subscribe, getFieldState, trigger],
   );
 
-  // Still to build here, so both apps get it: the live price quote from the pricing API, and submit.
+  return { ...form, pets };
+}
 
-  return form;
+/**
+ * The live price for what's on the form. It updates as pets are added, removed or given an animal
+ * type, and as the time changes. Until a time is picked, the total is the base charge.
+ */
+export function useBookingQuote(
+  control: Control<BookingFormValues, unknown, BookingRequest>,
+  rules: PricingRules,
+): BookingQuote {
+  const [pets, serviceTime] = useWatch({ control, name: ['pets', 'serviceTime'] });
+  const hours = hoursBetween(serviceTime.startTime, serviceTime.endTime);
+  return quoteBooking(
+    pets.map((pet) => pet.animalType),
+    hours > 0 ? hours : null, // NaN until both times are picked
+    rules,
+  );
 }

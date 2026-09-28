@@ -9,12 +9,19 @@
 export const ANIMAL_TYPES = ['dog', 'cat', 'pig'] as const;
 export type AnimalType = (typeof ANIMAL_TYPES)[number];
 
+/** How each animal type reads in the apps. */
+export const ANIMAL_TYPE_LABELS: Record<AnimalType, string> = {
+  dog: 'Dog',
+  cat: 'Cat',
+  pig: 'Pig',
+};
+
 /**
  * Rules the booking form checks in both apps (see booking-form/bookingFormSchema.ts). The mock API
  * should check them again before saving.
  */
 export const BOOKING_RULES = {
-  /** Hours per booking, from the assessment. Assumption: whole hours only. */
+  /** Hours per booking, from the assessment. Assumption: in half-hour steps (2, 2.5, ... 8). */
   minHours: 2,
   maxHours: 8,
   /**
@@ -23,10 +30,10 @@ export const BOOKING_RULES = {
    */
   serviceHours: { start: '07:00', end: '21:00' },
   /**
-   * Assumption: bookings start on the hour or half hour. The check looks at minutes past the hour,
-   * so keep this a divisor of 60.
+   * Assumption: bookings start and end on the hour or half hour. The check looks at minutes past
+   * the hour, so keep this a divisor of 60.
    */
-  startTimeStepMinutes: 30,
+  timeStepMinutes: 30,
   /** Assumption: names have a length limit, as a database column would. */
   maxNameLength: 50,
 } as const;

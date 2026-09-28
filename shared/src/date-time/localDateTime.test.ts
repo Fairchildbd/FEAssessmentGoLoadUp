@@ -1,6 +1,12 @@
 import { isValid } from 'date-fns/isValid';
 import { describe, expect, it } from 'vitest';
-import { DATE_FORMAT, matchesFormat, parseDateTime, TIME_FORMAT } from './localDateTime';
+import {
+  DATE_FORMAT,
+  hoursBetween,
+  matchesFormat,
+  parseDateTime,
+  TIME_FORMAT,
+} from './localDateTime';
 
 describe('parseDateTime', () => {
   it("reads a booking's date and time as local time", () => {
@@ -32,5 +38,17 @@ describe('matchesFormat', () => {
     for (const value of ['24:00', '9:30', '09:60', '9:30 AM', '']) {
       expect(matchesFormat(value, TIME_FORMAT), value).toBe(false);
     }
+  });
+});
+
+describe('hoursBetween', () => {
+  it('counts the hours from a start time to an end time', () => {
+    expect(hoursBetween('09:00', '17:00')).toBe(8);
+    expect(hoursBetween('09:30', '12:00')).toBe(2.5);
+    expect(hoursBetween('12:00', '09:00')).toBe(-3);
+  });
+
+  it('returns NaN when a time is missing', () => {
+    expect(hoursBetween('', '17:00')).toBeNaN();
   });
 });
