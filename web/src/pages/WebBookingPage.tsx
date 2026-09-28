@@ -6,30 +6,46 @@ import Container from '@mui/material/Container';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { useBookingForm, type BookingRequest } from '@pet-sitting/shared/booking-form';
+import { getDeviceTimeZone } from '@pet-sitting/shared/date-time';
+import { createBooking, MockApiError } from '@pet-sitting/shared/mock-api';
 import { mockDatabase } from '@pet-sitting/shared/mock-database';
 import { useState, type ReactNode } from 'react';
 import { Controller } from 'react-hook-form';
+import { Link } from 'react-router';
 import { WebPetFields } from '../booking-form/WebPetFields';
 import { WebPriceSummary } from '../booking-form/WebPriceSummary';
 import { WebServiceDateField } from '../booking-form/WebServiceDateField';
 import { WebServiceTimeField } from '../booking-form/WebServiceTimeField';
 
-// The rate card from the mock database. There's no API call yet: the form reads it directly.
+// The rate card from the mock database's seed, read directly for the live price. Bookings are saved
+// through the mock API, which prices them from the same rate card.
 const { pricingRules } = mockDatabase;
+
+/** ['Oscar', 'Sulley'] -> 'Oscar and Sulley' */
+const listFormat = new Intl.ListFormat('en', { type: 'conjunction' });
 
 /** The booking form: who you are, your pets, when, and the live price. Validation is all client-side. */
 export function WebBookingPage() {
-  const { control, handleSubmit, formState, reset, pets } = useBookingForm();
+  const { control, handleSubmit, formState, reset, setError, pets } = useBookingForm();
   const [submitted, setSubmitted] = useState<BookingRequest | null>(null);
 
   // Submit stays disabled until every input is filled in and valid. isValid runs the schema on
   // every change, while each field's error message still waits until the user leaves it.
 
-  const onSubmit = (request: BookingRequest) => {
-    // Sending the request (and checking for overlapping bookings) comes next.
-    setSubmitted(request);
-    reset();
+  const onSubmit = async (request: BookingRequest) => {
+    setSubmitted(null);
+    try {
+      await createBooking(request, getDeviceTimeZone());
+      setSubmitted(request);
+      reset();
+    } catch (error) {
+      // The server refused it (say, a pet is already booked then). Keep the form so it can be fixed.
+      const message =
+        error instanceof MockApiError ? error.message : 'Something went wrong. Please try again.';
+      setError('root.server', { message });
+    }
   };
+  const serverError = formState.errors.root?.server?.message;
 
   return (
     <Container component="main" maxWidth="sm" className="py-xl">
@@ -42,7 +58,8 @@ export function WebBookingPage() {
 
       {submitted && (
         <Alert severity="success" onClose={() => setSubmitted(null)} className="mt-lg">
-          Request received for {submitted.pets.map((pet) => pet.name).join(' and ')}.
+          Booked {listFormat.format(submitted.pets.map((pet) => pet.name))}.{' '}
+          <Link to={`/admin?date=${submitted.serviceDate}`}>See the day's bookings</Link>
         </Alert>
       )}
 
@@ -100,6 +117,8 @@ export function WebBookingPage() {
 
             <WebPriceSummary control={control} pricingRules={pricingRules} />
 
+            {serverError && <Alert severity="error">{serverError}</Alert>}
+
             <Button
               type="submit"
               variant="contained"
@@ -107,7 +126,7 @@ export function WebBookingPage() {
               disabled={!formState.isValid || formState.isSubmitting}
               className="rounded-pill"
             >
-              Request a sitter
+              {formState.isSubmitting ? 'Booking…' : 'Request a sitter'}
             </Button>
           </form>
         </CardContent>

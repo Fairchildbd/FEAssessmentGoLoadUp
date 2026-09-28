@@ -17,6 +17,11 @@ import { parse } from 'date-fns/parse';
 export const DATE_FORMAT = 'yyyy-MM-dd';
 export const TIME_FORMAT = 'HH:mm';
 
+/** A stored 'HH:mm' time as people read it: displayTime('17:00') is '5:00 PM'. */
+export function displayTime(time: string): string {
+  return format(parse(time, TIME_FORMAT, new Date()), 'h:mm a');
+}
+
 /** A booking's local date and time as a Date, e.g. parseDateTime('2026-10-03', '09:30'). */
 export function parseDateTime(date: string, time: string): Date {
   return parse(`${date} ${time}`, `${DATE_FORMAT} ${TIME_FORMAT}`, new Date());

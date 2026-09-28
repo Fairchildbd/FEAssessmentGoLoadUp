@@ -9,6 +9,8 @@
     "./date-time": "./src/date-time/localDateTime.ts",
     "./design-tokens": "./src/design-tokens/designTokens.ts",
     "./domain": "./src/domain/bookingDomain.ts",
+    "./mock-api": "./src/mock-api/mockApi.ts",
+    "./booking-schedule": "./src/booking-schedule/bookingSchedule.ts",
     "./mock-database": "./src/mock-database/mockDatabase.ts",
     "./pricing": "./src/pricing/pricingEngine.ts"
   },

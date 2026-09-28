@@ -2,7 +2,7 @@
 
 A pet-sitting booking app built as a monorepo: a **React** web app and a **React Native** app that share one TypeScript package for design tokens, domain types, the mock database and form logic. It is front end only; there is no backend in this repo.
 
-> **Status:** the web booking form works: several pets per request, a click-only date picker, a start-to-end time picker that only offers 2 to 8 hours in half-hour steps, all-client-side validation and a live itemized price. Submitting doesn't save anything yet. The mock API, overlap checks, admin pages and the mobile screens are next (see [Next steps](#next-steps)).
+> **Status:** the web booking form works: several pets per request, a click-only date picker, a start-to-end time picker that only offers 2 to 8 hours in half-hour steps, all-client-side validation and a live itemized price. Submitting saves through the mock API, which refuses a pet's overlapping bookings, and the admin page lists each day's bookings grouped by start time. The mobile screens are next (see [Next steps](#next-steps)).
 
 ## Quick start
 
@@ -31,10 +31,13 @@ shared/                  @pet-sitting/shared: platform-agnostic code used by bot
   src/domain/            bookingDomain.ts: data types and business rules
   src/mock-database/     mockDatabase.ts: the mock backend's data, plus tests for the seed
   src/pricing/           pricingEngine.ts: the itemized quote, plus its tests
+  src/mock-api/          mockApi.ts: the mock backend's endpoints (create and list bookings), plus tests
+  src/booking-schedule/  bookingSchedule.ts: the admin schedule (group by start time, load a day)
 web/                     @pet-sitting/web: React, Vite, MUI, Tailwind
   src/WebApp.tsx         root component: MUI theme and providers
   src/pages/             Web*Page.tsx
   src/booking-form/      the booking form's inputs and price summary (Web*Field.tsx, WebPriceSummary.tsx)
+  src/components/        WebDatePicker.tsx (used by the form and the admin page), WebNavBar.tsx
   src/theme/             webTheme.ts (MUI), tailwind.css
   tailwind.config.ts     Tailwind theme built from the shared tokens
   e2e/                   Playwright tests
@@ -79,7 +82,18 @@ shared/src/booking-form/bookingFormSchema.ts     zod schema: every field rule, i
 - **The $20 base charge is per request, not per pet.** One pet or twenty, it's charged once.
 - **Each pet is itemized, not written as an equation**: its hours and its hourly rate on separate lines under its name, with its subtotal beside it.
 - **The total always shows a price.** Until a time is picked it's the base charge alone, and each pet reads "Choose a time"; the pets are added as soon as there's a time.
-- For now the web page reads the rate card straight from the mock database. Fetching it through a mock API is a next step.
+- The live price reads the rate card straight from the seed data; the mock API prices saved bookings from the same rate card.
+
+## Mock API and the admin page
+
+`shared/src/mock-api/mockApi.ts` stands in for the backend. Its functions are async with about 300 ms of latency, so the apps call it as they would a server, and it reads and writes an in-memory copy of the seed data.
+
+- **`createBooking(request, timeZone)`** checks the request again with the form's schema, finds or creates the customer and pets (same names, ignoring case, per the assumptions below), and saves the submission as one booking (one appointment) holding all its pets. It refuses the whole request if any pet has a confirmed booking that overlaps the new time (back to back is fine, cancelled bookings don't count), and the form shows the reason.
+- **One submission, one appointment.** A booking lists its pets (`petIds`), and its price itemizes them: the $20 base once, then each pet's hourly charge, adding up to the total the form showed.
+- **`listBookings(date)`** returns a day's bookings with their customers and pets.
+- **Saved until the page reloads.** The two pages are routes in one app (React Router), so moving between them keeps the saved bookings; a reload starts again from the seed.
+
+The admin page (`/admin?date=YYYY-MM-DD`, default today) shows the day's total earnings on the title's line, right-aligned (confirmed bookings only: a cancelled booking earns nothing), then one card per start time, earliest first, titled like "3 appointments starting at 7:00 AM", with each appointment under the customer's name: its times, hours and number of pets, every pet with its charge, the base charge and the total. Cancelled bookings are listed with a "Cancelled" tag. Days change with the same `WebDatePicker` the form uses (past dates allowed here) or the previous and next buttons, and the date lives in the URL so the browser's back button steps through days. The grouping (`groupByStartTime`), the day's earnings (`dayEarningsCents`) and loading (`useDaySchedule`) are in `shared/`, ready for the mobile admin screen.
 
 ## Styling: shared tokens, platform themes
 
@@ -111,7 +125,7 @@ There is no server. `shared/src/mock-database/mockDatabase.ts` is a plain JSON o
 | `pricingRules` | `currency`, `baseChargeCents`, `hourlyRateCents` per animal                                                                                         | The rate card lives with the data, not in the apps, so prices can change without a new mobile release. Money is in integer cents.                         |
 | `customers`    | `id`, `firstName`, `lastName`, `createdAt`                                                                                                          |                                                                                                                                                            |
 | `pets`         | `id`, `customerId`, `name`, `animalType`, `createdAt`                                                                                               |                                                                                                                                                            |
-| `bookings`     | `id`, `customerId`, `petId`, `serviceDate`, `startTime`, `endTime`, `timeZone`, `hoursRequested`, `price`, `status`, `createdAt`, `updatedAt` | Times are local `'HH:mm'` in the booking's IANA `timeZone`. `price` is a snapshot of the itemized quote. `status` is `confirmed` or `cancelled`. |
+| `bookings`     | `id`, `customerId`, `petIds`, `serviceDate`, `startTime`, `endTime`, `timeZone`, `hoursRequested`, `price`, `status`, `createdAt`, `updatedAt` | One booking is one appointment: everything a customer booked in one submission, one or more pets. Times are local `'HH:mm'` in the booking's IANA `timeZone`. `price` is a snapshot of the itemized quote (base charge once, one line per pet). `status` is `confirmed` or `cancelled`. |
 
 The seed has 3 customers, 2 dogs, 2 cats, 2 pigs and 9 bookings, including:
 
@@ -138,8 +152,8 @@ Where the assessment is silent, these are the working assumptions. The data mode
 
 | Layer | Tool           | Where                      | Covers now                                                                                                                                                                                                  |
 | ----- | -------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Unit  | Vitest         | `shared/src/**/*.test.ts`  | The booking form's rules (against a fixed clock), the pricing engine (base charge once per request), the strict date and time format checks, and the mock database seed (2 of each animal, valid references, no double-booked pets). |
-| E2E   | Playwright     | `web/e2e/`                 | The booking form: the date opens from anywhere on the field and can't be typed in, the End column offers only 2 to 8 hours in half-hour steps and stops at closing, submit stays disabled until every input is filled in, the total for several pets charges the base once, and a complete request submits. The browser's time zone and clock are fixed, and reduced motion is on (the date picker ignores clicks during its opening animation, which only a test is fast enough to make). Admin page tests go here. |
+| Unit  | Vitest         | `shared/src/**/*.test.ts`  | The booking form's rules (against a fixed clock), the pricing engine (base charge once per request), the mock API (one booking per submission, overlap refusals, the itemized price), grouping by start time, the day's earnings, the strict date and time format checks, and the mock database seed (2 of each animal, valid references, prices that add up, no double-booked pets). |
+| E2E   | Playwright     | `web/e2e/`                 | The booking form: the date opens from anywhere on the field and can't be typed in, the End column offers only 2 to 8 hours in half-hour steps and stops at closing, submit stays disabled until every input is filled in, the total for several pets charges the base once, and a complete request submits. The admin page: the day's earnings beside the title; grouping by start time, earliest first; switching days; a submitted request appearing on it; and an overlapping booking refused. The browser's time zone and clock are fixed, and reduced motion is on (the date picker ignores clicks during its opening animation, which only a test is fast enough to make). |
 | CI    | GitHub Actions | `.github/workflows/ci.yml` | `npm run verify` plus the E2E tests on every push to `main` and every pull request.                                                                                                                        |
 
 The mobile app is checked by the TypeScript typecheck, `npx expo-doctor` and an iOS bundle, and the starter screen has been run in the iOS Simulator.
@@ -147,14 +161,14 @@ The mobile app is checked by the TypeScript typecheck, `npx expo-doctor` and an 
 ## Next steps
 
 - [x] Pricing engine in `shared/`, with unit tests
-- [ ] Mock API client in `shared/`: async calls with simulated latency against a copy of the mock database (quote, create booking, list bookings). Creating a booking should re-check the request with `bookingFormSchema`, reject a pet's overlapping bookings, and record `timeZone` from `getDeviceTimeZone()`
+- [x] Mock API in `shared/`: create and list bookings, with the schema re-check, overlap refusals and `timeZone`
 - [x] Live quote in `useBookingForm` (`useBookingQuote`)
-- [ ] Submit: send the request through the mock API, and handle overlapping bookings for each pet
+- [x] Submit: send the request through the mock API, and handle overlapping bookings for each pet
 - [x] Web: `WebBookingPage` (MUI inputs with `<Controller />`, including date and time pickers)
-- [ ] Web: routing and `WebAdminPage`
+- [x] Web: routing and `WebAdminPage`
 - [ ] Mobile: navigation, `MobileBookingScreen` (Paper inputs with `<Controller />`, including date and time pickers) and `MobileAdminScreen`
 - [x] E2E tests for the booking form
-- [ ] E2E tests for the admin page
+- [x] E2E tests for the admin page
 - [x] Delete the web starter page and smoke test
 - [ ] Delete the mobile starter screen
 
@@ -177,11 +191,14 @@ The assessment allows AI tools as long as their use is documented. Every prompt 
 - Bookings have a start time as well as a date (Prompt 2)
 - Several pets on one request; exactly two inputs for when (a click-only date picker, and one time input for start and end, holding the 2 to 8 hour limits); submit disabled with a matching error outside 2 to 8 hours; the $20 base charged once per request; each pet's charges itemized rather than written as an equation; validation entirely on the front end (Prompt 4)
 - End times limited to 2 to 8 hours after the start, so a wrong length can't be picked; start and end times every 30 minutes; the total always shows a price; submit disabled until every input is filled in (Prompt 5)
+- An admin page listing each day's bookings, earliest start first, with bookings that start together in one card titled "x appointments starting at 7:00 AM"; days switched with the form's date picker; easy switching between the form and the admin page; submit writes to the (mock) backend (Prompt 6)
 
 **Corrections I made to AI output:**
 
 - Replaced the AI's hand-written date and time helpers with date-fns (Prompt 3)
 - Replaced the AI's time picker, which listed every length and relied on errors, with one that only offers valid lengths; and asked for half-hour end times instead of whole hours (Prompt 5)
+- Changed the AI's one-booking-per-pet design: one submission is one appointment, with all its pets under the customer's name (Prompt 7)
+- The day's total earnings at the top of the admin page, right-aligned with the "Bookings" title (Prompt 8)
 
 ## Prompts
 
@@ -358,3 +375,73 @@ A correction to Prompt 4's time picker: instead of listing every length and show
 - **Submit:** disabled while `formState.isValid` is false, so any empty or invalid input (including a new, empty pet row) keeps it disabled. Error messages still wait until the user leaves a field.
 - Rewrote the time and submit E2E tests (now 5), and added unit tests for half-hour prices, the base-only total, and end times off the half hour.
 - Ran all checks, all passing: typecheck, lint, format check, 30 unit tests, the web build and the 5 E2E tests.
+
+### Prompt 6: Saving bookings, and the admin page
+
+- **Tool:** Claude Code (desktop app), Claude Opus 5.5
+- **Date:** 2026-09-28
+- **Files written:** `shared/src/mock-api/` and `shared/src/booking-schedule/` (new, with tests), `shared/src/date-time/localDateTime.ts` and its test (`displayTime`), `shared/package.json`, `web/src/components/` (new: `WebDatePicker.tsx`, `WebNavBar.tsx`), `web/src/booking-form/WebServiceDateField.tsx` and `WebServiceTimeField.tsx`, `web/src/pages/WebAdminPage.tsx` (new), `web/src/pages/WebBookingPage.tsx`, `web/src/WebApp.tsx`, `web/e2e/` (new admin spec and shared form helpers), `web/package.json` and this README
+
+_Verbatim._
+
+> Now we need to add the admin page. We need to ensure that the submission button works, and actually writes to the backend.  Make sure that you can easily switch over from the form to the admin page.
+>
+> Make sure the admin page lists bookings by day, starting with the earliest to latest according to the beginning time. If several bookings start at the same time, make sure they are listed together under the same time frame. For instance, booking 1, 2, and 3 all start at 7:00 AM, the Header of the card should be x appoints starting at  7:00 AM.
+>
+> For the admin page, we want to be able to switch between days, we can easily reuse the date picker component from the form for this.
+
+#### Use Case
+
+Make submit save the request to the (mock) backend, add the admin page that lists a day's bookings grouped by start time, and make it easy to move between the form and the admin page. The admin page reuses the form's date picker to change days.
+
+#### What the AI did
+
+- **Mock API** (`shared/src/mock-api/`): `createBooking` and `listBookings` over an in-memory copy of the seed, with simulated latency. `createBooking` re-checks the request with the form's schema, reuses matching customers and pets, saves one booking per pet with a price snapshot (the $20 base on the first pet's booking only), and refuses the request if any pet's confirmed booking overlaps it. Overlaps had been left for "next" in Prompt 4; the AI included them here because a working submit writes bookings, and the seed's same-day bookings would otherwise be double-booked.
+- **Schedule** (`shared/src/booking-schedule/`): `groupByStartTime` (earliest first, bookings that start together in one group) and `useDaySchedule`, which loads a day and ignores a slow answer for a day the user has left. Rewrote the hook once because React's lint rule forbids resetting state inside an effect.
+- **Web:** installed React Router 7 (version 8 needs React 19.2.7, and the repo pins 19.2.3 for Expo), added a nav bar with "Book a sitter" and "Admin" tabs, and wired the form's submit to `createBooking`: "Booking…" while saving, a success message with a link to that day on the admin page, or the server's reason in an error message with the form kept as it was.
+- **Date picker reuse:** moved the click-only picker into `web/src/components/WebDatePicker.tsx`; the form's date field wraps it for React Hook Form, and the admin page uses it directly (past dates allowed), plus previous and next day buttons. The date is in the URL (`/admin?date=2026-10-03`).
+- **Admin page:** one card per start time titled "N appointments starting at 7:00 AM" ("1 appointment" when single), with each booking's pet, owner, times, hours and price, and a "Cancelled" tag where needed. Cancelled bookings count toward the card title.
+- Added unit tests for the mock API and grouping (41 in total) and 4 admin E2E tests (9 in total), moving the form-filling steps into `web/e2e/bookingFormHelpers.ts`.
+- Ran all checks, all passing: typecheck, lint, format check, 41 unit tests, the web build and 9 E2E tests. Checked the admin page in screenshots at desktop and phone widths. The build warns that the JavaScript bundle is over 500 KB (about 860 KB, mostly MUI and its date pickers); loading each page separately would shrink it, and hasn't been done.
+
+### Prompt 7: One submission is one appointment
+
+- **Tool:** Claude Code (desktop app), Claude Opus 5.5
+- **Date:** 2026-09-28
+- **Files written:** `shared/src/domain/bookingDomain.ts`, `shared/src/mock-database/` (seed and its test), `shared/src/mock-api/` (API and tests), `shared/src/booking-schedule/` (grouping and tests), `web/src/pages/WebAdminPage.tsx`, `web/e2e/webAdminPage.spec.ts` and this README
+
+_Verbatim._
+
+> One submission should equal one appointment. I created 1 appointment for four pets, and when I navigate to the admin portion of this, I see 4 appointments starting at 8:30 AM. That should be 1 appointment starting at 8:30 AM with the appointment including the 4 pets under the 1 person's name.
+
+#### Use Case
+
+A correction to Prompt 6: the AI saved each pet as its own booking, so one submission for four pets showed as four appointments. One submission should be one appointment, listed once under the customer's name with all its pets.
+
+#### What the AI did
+
+- **Data model:** a booking is now one appointment. `petId` became `petIds` (every pet in the submission), and the price snapshot became one base charge plus one line per pet (`pets: [{ petId, hourlyRateCents, subtotalCents }]`). Converted the 9 seed bookings (each still has one pet) and added a seed test that every price adds up.
+- **Mock API:** `createBooking` saves one booking and returns it; the overlap check looks at every pet in each existing booking. `listBookings` returns each booking with all its pets.
+- **Admin page:** each appointment is one entry under the customer's name, showing its times, hours and number of pets, then each pet with its charge, the base charge and the total. The card title counts appointments, so the four-pet submission reads "1 appointment starting at 8:30 AM".
+- Left the seed as it was: Jordan Rivera's two dogs at 9:00 on 3 October are two separate bookings made minutes apart, so they still show as 2 appointments.
+- Updated the unit tests (43) and the admin E2E tests; one E2E test now books the four-pet scenario from this prompt. Ran all checks, all passing: typecheck, lint, format check, 43 unit tests, the web build and 9 E2E tests. Checked the admin page in a screenshot.
+
+### Prompt 8: The day's total earnings
+
+- **Tool:** Claude Code (desktop app), Claude Opus 5.5
+- **Date:** 2026-09-28
+- **Files written:** `shared/src/booking-schedule/` (`dayEarningsCents` and tests), `web/src/pages/WebAdminPage.tsx`, `web/e2e/webAdminPage.spec.ts` and this README
+
+_Verbatim._
+
+> We should have a total earnings for the day at the top of the page that displays right aligned to the "Bookings" title.
+
+#### Use Case
+
+Show what the selected day earns at the top of the admin page, on the same line as the "Bookings" title and aligned to the right.
+
+#### What the AI did
+
+- Added `dayEarningsCents` in `shared/src/booking-schedule/`: the sum of the day's confirmed bookings' totals. **Chose to leave cancelled bookings out**, which the prompt didn't specify, since a cancelled booking earns nothing: 10 October shows $180, not $320.
+- Put the amount beside the title on the admin page, with "Total earnings" under it, lined up with the date under the title. It shows "…" while the day loads and $0 on a day without bookings.
+- Added 3 unit tests (46 in total) and E2E checks for the amount on several days (including after a new booking) and for its position: the same line as the title, at the schedule's right edge. Ran all checks, all passing: typecheck, lint, format check, 46 unit tests, the web build and 9 E2E tests. Checked the header in screenshots at desktop and phone widths.

@@ -79,17 +79,30 @@ export interface PricingRules {
   hourlyRateCents: Record<AnimalType, number>;
 }
 
-/** An itemized price. Each booking keeps a copy, so a later rate change can't alter past totals. */
+/** One pet's line on a booking's price. */
+export interface PetCharge {
+  petId: string;
+  hourlyRateCents: number;
+  /** hourlyRateCents x the booking's hours. */
+  subtotalCents: number;
+}
+
+/**
+ * An itemized price: the base charge once for the whole booking, then each pet's hourly charge.
+ * Each booking keeps a copy, so a later rate change can't alter past totals.
+ */
 export interface PriceBreakdown {
   currency: 'USD';
   baseChargeCents: number;
-  hourlyRateCents: number;
   hours: number;
+  /** One line per pet, in the same order as the booking's petIds. */
+  pets: PetCharge[];
   totalCents: number;
 }
 
 /**
- * One pet sat for a block of time.
+ * One appointment: everything a customer booked in one submission. All its pets are sat together,
+ * for the same date and time, and the base charge is paid once.
  *
  * The gotcha: a pet can have several bookings on one date, but it can't be in two places at once.
  * A pet's confirmed bookings must not overlap, so the pet is returned before its next booking starts
@@ -100,7 +113,8 @@ export interface PriceBreakdown {
 export interface Booking {
   id: string;
   customerId: string;
-  petId: string;
+  /** Every pet in the appointment, in the order the customer listed them. At least one. */
+  petIds: string[];
   /** Local calendar date, 'YYYY-MM-DD'. Read it with date-fns, never `new Date()` (see localDateTime.ts). */
   serviceDate: string;
   /** Local start time, 24-hour 'HH:mm'. */

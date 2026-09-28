@@ -85,7 +85,7 @@ export const mockDatabase: MockDatabase = {
     {
       id: 'bkg_001',
       customerId: 'cus_001',
-      petId: 'pet_001',
+      petIds: ['pet_001'],
       serviceDate: '2026-09-20',
       startTime: '09:00',
       endTime: '13:00',
@@ -94,8 +94,8 @@ export const mockDatabase: MockDatabase = {
       price: {
         currency: 'USD',
         baseChargeCents: 2000,
-        hourlyRateCents: 2000,
         hours: 4,
+        pets: [{ petId: 'pet_001', hourlyRateCents: 2000, subtotalCents: 8000 }],
         totalCents: 10000,
       },
       status: 'confirmed',
@@ -105,7 +105,7 @@ export const mockDatabase: MockDatabase = {
     {
       id: 'bkg_002',
       customerId: 'cus_002',
-      petId: 'pet_002',
+      petIds: ['pet_002'],
       serviceDate: '2026-10-03',
       startTime: '09:00',
       endTime: '11:00',
@@ -114,8 +114,8 @@ export const mockDatabase: MockDatabase = {
       price: {
         currency: 'USD',
         baseChargeCents: 2000,
-        hourlyRateCents: 1000,
         hours: 2,
+        pets: [{ petId: 'pet_002', hourlyRateCents: 1000, subtotalCents: 2000 }],
         totalCents: 4000,
       },
       status: 'confirmed',
@@ -125,7 +125,7 @@ export const mockDatabase: MockDatabase = {
     {
       id: 'bkg_003',
       customerId: 'cus_002',
-      petId: 'pet_003',
+      petIds: ['pet_003'],
       serviceDate: '2026-10-03',
       startTime: '09:00',
       endTime: '11:00',
@@ -134,8 +134,8 @@ export const mockDatabase: MockDatabase = {
       price: {
         currency: 'USD',
         baseChargeCents: 2000,
-        hourlyRateCents: 1000,
         hours: 2,
+        pets: [{ petId: 'pet_003', hourlyRateCents: 1000, subtotalCents: 2000 }],
         totalCents: 4000,
       },
       status: 'confirmed',
@@ -145,7 +145,7 @@ export const mockDatabase: MockDatabase = {
     {
       id: 'bkg_004',
       customerId: 'cus_002',
-      petId: 'pet_002',
+      petIds: ['pet_002'],
       serviceDate: '2026-10-03',
       startTime: '11:00',
       endTime: '13:00',
@@ -154,8 +154,8 @@ export const mockDatabase: MockDatabase = {
       price: {
         currency: 'USD',
         baseChargeCents: 2000,
-        hourlyRateCents: 1000,
         hours: 2,
+        pets: [{ petId: 'pet_002', hourlyRateCents: 1000, subtotalCents: 2000 }],
         totalCents: 4000,
       },
       status: 'confirmed',
@@ -165,7 +165,7 @@ export const mockDatabase: MockDatabase = {
     {
       id: 'bkg_005',
       customerId: 'cus_003',
-      petId: 'pet_004',
+      petIds: ['pet_004'],
       serviceDate: '2026-10-05',
       startTime: '09:00',
       endTime: '17:00',
@@ -174,8 +174,8 @@ export const mockDatabase: MockDatabase = {
       price: {
         currency: 'USD',
         baseChargeCents: 2000,
-        hourlyRateCents: 500,
         hours: 8,
+        pets: [{ petId: 'pet_004', hourlyRateCents: 500, subtotalCents: 4000 }],
         totalCents: 6000,
       },
       status: 'confirmed',
@@ -185,7 +185,7 @@ export const mockDatabase: MockDatabase = {
     {
       id: 'bkg_006',
       customerId: 'cus_003',
-      petId: 'pet_005',
+      petIds: ['pet_005'],
       serviceDate: '2026-10-05',
       startTime: '10:00',
       endTime: '13:00',
@@ -194,8 +194,8 @@ export const mockDatabase: MockDatabase = {
       price: {
         currency: 'USD',
         baseChargeCents: 2000,
-        hourlyRateCents: 500,
         hours: 3,
+        pets: [{ petId: 'pet_005', hourlyRateCents: 500, subtotalCents: 1500 }],
         totalCents: 3500,
       },
       status: 'confirmed',
@@ -205,7 +205,7 @@ export const mockDatabase: MockDatabase = {
     {
       id: 'bkg_007',
       customerId: 'cus_001',
-      petId: 'pet_006',
+      petIds: ['pet_006'],
       serviceDate: '2026-10-10',
       startTime: '08:00',
       endTime: '13:00',
@@ -214,8 +214,8 @@ export const mockDatabase: MockDatabase = {
       price: {
         currency: 'USD',
         baseChargeCents: 2000,
-        hourlyRateCents: 2000,
         hours: 5,
+        pets: [{ petId: 'pet_006', hourlyRateCents: 2000, subtotalCents: 10000 }],
         totalCents: 12000,
       },
       status: 'confirmed',
@@ -225,7 +225,7 @@ export const mockDatabase: MockDatabase = {
     {
       id: 'bkg_008',
       customerId: 'cus_001',
-      petId: 'pet_001',
+      petIds: ['pet_001'],
       serviceDate: '2026-10-10',
       startTime: '10:00',
       endTime: '16:00',
@@ -234,8 +234,8 @@ export const mockDatabase: MockDatabase = {
       price: {
         currency: 'USD',
         baseChargeCents: 2000,
-        hourlyRateCents: 2000,
         hours: 6,
+        pets: [{ petId: 'pet_001', hourlyRateCents: 2000, subtotalCents: 12000 }],
         totalCents: 14000,
       },
       status: 'cancelled',
@@ -245,7 +245,7 @@ export const mockDatabase: MockDatabase = {
     {
       id: 'bkg_009',
       customerId: 'cus_001',
-      petId: 'pet_001',
+      petIds: ['pet_001'],
       serviceDate: '2026-10-10',
       startTime: '12:00',
       endTime: '14:00',
@@ -254,8 +254,8 @@ export const mockDatabase: MockDatabase = {
       price: {
         currency: 'USD',
         baseChargeCents: 2000,
-        hourlyRateCents: 2000,
         hours: 2,
+        pets: [{ petId: 'pet_001', hourlyRateCents: 2000, subtotalCents: 4000 }],
         totalCents: 6000,
       },
       status: 'confirmed',

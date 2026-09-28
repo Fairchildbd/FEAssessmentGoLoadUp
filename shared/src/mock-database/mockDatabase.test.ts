@@ -26,7 +26,7 @@ describe('mockDatabase seed', () => {
     }
   });
 
-  it('only references customers and pets that exist, and each booking matches its pet owner', () => {
+  it("only references customers and pets that exist, and each booking matches its pets' owner", () => {
     const customerIds = new Set(customers.map((customer) => customer.id));
     const petsById = new Map(pets.map((pet) => [pet.id, pet]));
 
@@ -34,7 +34,25 @@ describe('mockDatabase seed', () => {
       expect(customerIds.has(pet.customerId), pet.id).toBe(true);
     }
     for (const booking of bookings) {
-      expect(petsById.get(booking.petId)?.customerId, booking.id).toBe(booking.customerId);
+      expect(booking.petIds.length, booking.id).toBeGreaterThan(0);
+      for (const petId of booking.petIds) {
+        expect(petsById.get(petId)?.customerId, booking.id).toBe(booking.customerId);
+      }
+    }
+  });
+
+  it('itemizes each booking: one base charge, then one line per pet, adding up to the total', () => {
+    for (const { id, petIds, hoursRequested, price } of bookings) {
+      expect(
+        price.pets.map((line) => line.petId),
+        id,
+      ).toEqual(petIds);
+      expect(price.hours, id).toBe(hoursRequested);
+      for (const line of price.pets) {
+        expect(line.subtotalCents, id).toBe(line.hourlyRateCents * price.hours);
+      }
+      const petsTotal = price.pets.reduce((sum, line) => sum + line.subtotalCents, 0);
+      expect(price.totalCents, id).toBe(price.baseChargeCents + petsTotal);
     }
   });
 
@@ -70,7 +88,7 @@ describe('mockDatabase seed', () => {
       const clashes = confirmedBookings.filter(
         (other) =>
           other.id !== booking.id &&
-          other.petId === booking.petId &&
+          other.petIds.some((petId) => booking.petIds.includes(petId)) &&
           areIntervalsOverlapping(slotOf(booking), slotOf(other)),
       );
       expect(clashes, booking.id).toEqual([]);
@@ -80,12 +98,16 @@ describe('mockDatabase seed', () => {
   it('includes the same-day scenario: 2 dogs, 3 two-hour bookings, one dog booked back-to-back', () => {
     const dogIds = pets.filter((pet) => pet.animalType === 'dog').map((pet) => pet.id);
     const dogBookings = bookings.filter(
-      (booking) => dogIds.includes(booking.petId) && booking.serviceDate === '2026-10-03',
+      (booking) =>
+        booking.petIds.some((petId) => dogIds.includes(petId)) &&
+        booking.serviceDate === '2026-10-03',
     );
     expect(dogBookings).toHaveLength(3);
     expect(dogBookings.every((booking) => booking.hoursRequested === 2)).toBe(true);
 
-    const [firstVisit, secondVisit] = dogBookings.filter((booking) => booking.petId === 'pet_002');
+    const [firstVisit, secondVisit] = dogBookings.filter((booking) =>
+      booking.petIds.includes('pet_002'),
+    );
     expect(secondVisit?.startTime).toBe(firstVisit?.endTime);
   });
 
@@ -94,7 +116,7 @@ describe('mockDatabase seed', () => {
     const rebooked = confirmedBookings.filter((booking) =>
       cancelledBookings.some(
         (cancelled) =>
-          cancelled.petId === booking.petId &&
+          cancelled.petIds.some((petId) => booking.petIds.includes(petId)) &&
           areIntervalsOverlapping(slotOf(cancelled), slotOf(booking)),
       ),
     );

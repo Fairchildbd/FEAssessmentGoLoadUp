@@ -6,7 +6,12 @@ import MenuList from '@mui/material/MenuList';
 import Popover from '@mui/material/Popover';
 import TextField from '@mui/material/TextField';
 import type { BookingFormValues, BookingRequest } from '@pet-sitting/shared/booking-form';
-import { hoursBetween, parseDateTime, TIME_FORMAT } from '@pet-sitting/shared/date-time';
+import {
+  displayTime,
+  hoursBetween,
+  parseDateTime,
+  TIME_FORMAT,
+} from '@pet-sitting/shared/date-time';
 import { BOOKING_RULES } from '@pet-sitting/shared/domain';
 import { addMinutes } from 'date-fns/addMinutes';
 import { format } from 'date-fns/format';
@@ -17,9 +22,6 @@ import { useRef, useState, type KeyboardEvent } from 'react';
 import { Controller, useWatch, type Control } from 'react-hook-form';
 
 const { minHours, maxHours, serviceHours, timeStepMinutes } = BOOKING_RULES;
-
-/** '17:00' -> '5:00 PM' */
-const displayTime = (time: string) => format(parse(time, TIME_FORMAT, new Date()), 'h:mm a');
 
 const pluralHours = (hours: number) => `${hours} ${hours === 1 ? 'hour' : 'hours'}`;
 

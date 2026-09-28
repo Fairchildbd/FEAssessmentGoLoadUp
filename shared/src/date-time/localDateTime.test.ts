@@ -2,6 +2,7 @@ import { isValid } from 'date-fns/isValid';
 import { describe, expect, it } from 'vitest';
 import {
   DATE_FORMAT,
+  displayTime,
   hoursBetween,
   matchesFormat,
   parseDateTime,
@@ -50,5 +51,12 @@ describe('hoursBetween', () => {
 
   it('returns NaN when a time is missing', () => {
     expect(hoursBetween('', '17:00')).toBeNaN();
+  });
+});
+
+describe('displayTime', () => {
+  it('shows a stored time on a 12-hour clock', () => {
+    expect(displayTime('07:00')).toBe('7:00 AM');
+    expect(displayTime('17:30')).toBe('5:30 PM');
   });
 });

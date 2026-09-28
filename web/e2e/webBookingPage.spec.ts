@@ -1,4 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import { fillPet, pickDate, pickTime, submitButton } from './bookingFormHelpers';
 
 // The date picker ignores a click that lands while its calendar is still animating open, which
 // only a test is fast enough to do. Reduced motion turns the animation off.
@@ -9,32 +10,6 @@ test.beforeEach(async ({ page }) => {
   await page.clock.setFixedTime(new Date('2026-10-01T16:00:00Z'));
   await page.goto('/');
 });
-
-const submitButton = (page: Page) => page.getByRole('button', { name: 'Request a sitter' });
-
-async function pickTime(page: Page, start: string, end: string) {
-  await page.getByRole('textbox', { name: 'Time' }).click();
-  await page
-    .getByRole('menu', { name: 'Start time' })
-    .getByRole('menuitem', { name: start })
-    .click();
-  await page
-    .getByRole('menu', { name: 'End time' })
-    .getByRole('menuitem', { name: new RegExp(`^${end}`) })
-    .click();
-}
-
-async function pickDate(page: Page, day: string) {
-  await page.getByRole('group', { name: 'Date' }).click();
-  await page.getByRole('gridcell', { name: day, exact: true }).click();
-}
-
-async function fillPet(page: Page, index: number, name: string, type: string) {
-  const pet = page.getByRole('group', { name: `Pet ${index + 1}` });
-  await pet.getByRole('textbox', { name: "Pet's name" }).fill(name);
-  await pet.getByRole('combobox', { name: 'Animal type' }).click();
-  await page.getByRole('option', { name: type }).click();
-}
 
 test('opens the date picker from anywhere on the field and blocks typing', async ({ page }) => {
   const dateField = page.getByRole('group', { name: 'Date' });
@@ -139,5 +114,5 @@ test('keeps submit disabled until every input is filled in', async ({ page }) =>
   await page.getByRole('button', { name: 'Remove Pet 3' }).click();
 
   await submitButton(page).click();
-  await expect(page.getByRole('alert')).toHaveText(/Request received for Oscar and Sulley/);
+  await expect(page.getByRole('alert')).toContainText('Booked Oscar and Sulley.');
 });
