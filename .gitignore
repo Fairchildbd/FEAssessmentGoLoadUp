@@ -1,0 +1,41 @@
+# dependencies
+node_modules/
+
+# builds
+dist/
+*.tsbuildinfo
+
+# web: Playwright output
+web/playwright-report/
+web/test-results/
+web/blob-report/
+web/playwright/.cache/
+
+# mobile: Expo
+.expo/
+web-build/
+expo-env.d.ts
+.metro-health-check*
+
+# mobile: generated native folders (Expo prebuild creates these on demand)
+mobile/ios/
+mobile/android/
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+
+# debug logs
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# local env files
+.env*.local
+
+# OS / editor
+.DS_Store

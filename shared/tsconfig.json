@@ -1,0 +1,9 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    // "DOM" is here only for web-standard APIs React Native also provides (fetch, setTimeout,
+    // AbortController). ESLint blocks browser-only globals such as window and document in shared/.
+    "lib": ["ES2022", "DOM"]
+  },
+  "include": ["src"]
+}

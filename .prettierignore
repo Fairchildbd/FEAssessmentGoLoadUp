@@ -1,0 +1,3 @@
+# The README logs AI prompts verbatim; formatting would rewrite them.
+*.md
+package-lock.json
