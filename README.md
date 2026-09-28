@@ -2,7 +2,7 @@
 
 A pet-sitting booking app built as a monorepo: a **React** web app and a **React Native** app that share one TypeScript package for design tokens, domain types, the mock database and form logic. It is front end only; there is no backend in this repo.
 
-> **Status:** boilerplate. The monorepo, shared package, themes, mock database and test tooling are set up and verified. The booking form, pricing engine, mock API and admin pages are next (see [Next steps](#next-steps)).
+> **Status:** boilerplate. The monorepo, shared package, themes, mock database, test tooling and the shared booking-form logic (React Hook Form, with date and time) are set up and verified. The form UI, pricing engine, mock API and admin pages are next (see [Next steps](#next-steps)).
 
 ## Quick start
 
@@ -25,7 +25,8 @@ npm run test:e2e  # Playwright E2E tests (first time: cd web && npx playwright i
 
 ```text
 shared/                  @pet-sitting/shared: platform-agnostic code used by both apps
-  src/booking-form/      useBookingForm.ts: booking-form logic shared by web and mobile
+  src/booking-form/      useBookingForm.ts (React Hook Form) and bookingFormSchema.ts (validation)
+  src/date-time/         localDateTime.ts: the date and time formats bookings use, for date-fns
   src/design-tokens/     designTokens.ts: colors, spacing, radius, type scale
   src/domain/            bookingDomain.ts: data types and business rules
   src/mock-database/     mockDatabase.ts: the mock backend's data, plus tests for the seed
@@ -50,6 +51,22 @@ The file name tells you, without looking at the path:
 - **Shared code has no prefix** and is imported by package name, so the import line says it's shared: `import { useBookingForm } from '@pet-sitting/shared/booking-form'`. The public modules are listed under `exports` in `shared/package.json`.
 - **No `index.ts` barrels**, so source files don't share names. The only generic names are the entry points the tools expect (`web/src/main.tsx`, `mobile/index.ts`) and config files like `package.json`.
 - **ESLint guards the boundary.** Code in `shared/` can't import `react-dom`, `react-native`, MUI, Paper or Expo, or use browser-only globals like `window`.
+
+## Booking form: React Hook Form in `shared/`
+
+```text
+shared/src/booking-form/bookingFormSchema.ts     zod schema: every field rule, including date and time
+  └─ shared/src/booking-form/useBookingForm.ts   useForm() with zodResolver, defaults, cross-field re-checks
+       ├─ web/                                    MUI inputs, each bound with <Controller />
+       └─ mobile/                                 React Native Paper inputs, each bound with <Controller />
+```
+
+- **One hook, two UIs.** React Hook Form's core doesn't depend on the DOM, so `useBookingForm()` lives in `shared/` and returns the usual `useForm` object (`control`, `handleSubmit`, `formState`, ...). Each app binds its own inputs with `<Controller />`: React Native has no DOM inputs for `register`, and MUI's selects and pickers are controlled components too.
+- **One schema for the apps and the mock API.** The rules are a zod schema, connected with `zodResolver`. The mock API can parse requests with the same schema, so it re-checks exactly what the apps check.
+- **Two types.** `BookingFormValues` is what the form holds while someone edits it (`animalType` can be `null`). `BookingRequest` is what `handleSubmit` receives once the form is valid (names trimmed, an animal chosen).
+- **When errors show.** With `mode: 'onTouched'`, a field is checked when the user leaves it, then on every change. A start time's validity also depends on the date and the number of hours, so the hook re-checks it when either changes.
+- **Date and time.** The form holds `serviceDate` (`'YYYY-MM-DD'`) and `startTime` (`'HH:mm'`) as strings. All date and time work uses [date-fns](https://date-fns.org/), which runs the same on web and React Native. Pickers return `Date` objects: store them with `format(date, DATE_FORMAT)` or `format(date, TIME_FORMAT)`, and read the strings back with `parse`. The format constants come from `@pet-sitting/shared/date-time`.
+- **Import date-fns one function at a time** (`import { format } from 'date-fns/format'`). Metro doesn't tree-shake: a single `import { format } from 'date-fns'` added 215 modules and about 200 KB to the iOS bundle. ESLint blocks the root import.
 
 ## Styling: shared tokens, platform themes
 
@@ -76,49 +93,51 @@ shared/src/design-tokens/designTokens.ts     hex colors and unitless numbers
 
 There is no server. `shared/src/mock-database/mockDatabase.ts` is a plain JSON object standing in for the backend's data store. Treat it as seed data: a mock API should copy it into memory and read and write the copy. Types and rules live in `shared/src/domain/bookingDomain.ts`.
 
-| Collection     | Fields                                                                                                       | Notes                                                                                                                              |
-| -------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `pricingRules` | `currency`, `baseChargeCents`, `hourlyRateCents` per animal                                                  | The rate card lives with the data, not in the apps, so prices can change without a new mobile release. Money is in integer cents. |
-| `customers`    | `id`, `firstName`, `lastName`, `createdAt`                                                                   |                                                                                                                                    |
-| `pets`         | `id`, `customerId`, `name`, `animalType`, `createdAt`                                                        |                                                                                                                                    |
-| `bookings`     | `id`, `customerId`, `petId`, `serviceDate`, `hoursRequested`, `price`, `status`, `createdAt`, `updatedAt` | `price` is a snapshot of the itemized quote. `status` is `confirmed` or `cancelled`.                                               |
+| Collection     | Fields                                                                                                                                              | Notes                                                                                                                                                      |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pricingRules` | `currency`, `baseChargeCents`, `hourlyRateCents` per animal                                                                                         | The rate card lives with the data, not in the apps, so prices can change without a new mobile release. Money is in integer cents.                         |
+| `customers`    | `id`, `firstName`, `lastName`, `createdAt`                                                                                                          |                                                                                                                                                            |
+| `pets`         | `id`, `customerId`, `name`, `animalType`, `createdAt`                                                                                               |                                                                                                                                                            |
+| `bookings`     | `id`, `customerId`, `petId`, `serviceDate`, `startTime`, `endTime`, `timeZone`, `hoursRequested`, `price`, `status`, `createdAt`, `updatedAt` | Times are local `'HH:mm'` in the booking's IANA `timeZone`. `price` is a snapshot of the itemized quote. `status` is `confirmed` or `cancelled`. |
 
-The seed has 3 customers, 2 dogs, 2 cats, 2 pigs and 8 bookings, including:
+The seed has 3 customers, 2 dogs, 2 cats, 2 pigs and 9 bookings, including:
 
-- **Jordan Rivera's 2 dogs with 3 two-hour bookings on 2026-10-03.** Biscuit has 2 of them, back-to-back (4 hours).
-- **Miso booked for the full 8 hours on 2026-10-05**, so that day is full for Miso.
-- **A cancelled booking** (Hamlet, 2026-10-10), which no longer counts toward his hours.
+- **Jordan Rivera's 2 dogs with 3 two-hour bookings on 2026-10-03.** Both dogs are booked 09:00–11:00, then Biscuit again 11:00–13:00, starting the minute he's returned.
+- **Miso booked 09:00–17:00 on 2026-10-05**, so another booking for Miso that day has to fit before 09:00 or after 17:00.
+- **A cancellation** (Hamlet, 10:00–16:00 on 2026-10-10) that freed the slot for his 12:00–14:00 booking.
 
 ## Assumptions
 
 Where the assessment is silent, these are the working assumptions. The data model reflects them.
 
-1. **One pet, several bookings in a day.** The form has no start time, so a pet's bookings on the same date run back-to-back: the pet is returned before the next one starts. Together they must fit in one 8-hour care day (`BOOKING_RULES.maxHoursPerPetPerDay`), the length of the longest single booking.
-2. **Whole hours only**, from 2 to 8.
-3. **The service date is a calendar date** (`'YYYY-MM-DD'`), today or later in the customer's time zone. It is never passed to `new Date()`, which parses it as UTC midnight and shows the previous day in US time zones.
-4. **Identity without accounts.** The same first + last name (trimmed, case-insensitive) is the same customer, and a customer's pet is identified by name + animal type. In production these would be signed-in user and pet ids.
-5. **Prices come from the (mock) server.** The rate card is in the database, money is stored in integer cents, and each booking keeps a snapshot of its price, so a later rate change doesn't alter past totals.
-6. **Bookings are confirmed when created.** Cancelled bookings stay listed but free up the pet's hours.
-7. **Out of scope:** sitter availability and assignment, payments, and authentication for the admin page.
-8. **Seed dates are fixed** (September to October 2026).
+1. **No double-booking a pet.** A pet can have several bookings on one date, but its confirmed bookings can't overlap: the pet is returned before its next booking starts. Back-to-back is fine (11:00–13:00 can follow 09:00–11:00), with no buffer in between. Only the mock API can check this, because it needs the existing bookings; date-fns `areIntervalsOverlapping` does the comparison.
+2. **Service hours are 07:00–21:00** local time. A booking must start and end inside them, so it never runs past midnight, and it starts on the hour or half hour.
+3. **Whole hours only**, from 2 to 8.
+4. **Dates and times are local to where the pet is.** They're stored as strings (`'YYYY-MM-DD'`, `'HH:mm'`) with that place's IANA time zone beside them, which is what turns them into an exact moment. A booking must start in the future: later today is fine. "Now" comes from the device's clock and time zone, assuming people book from where the pet is. Date strings are read with date-fns `parse`, never `new Date()`, which parses them as UTC midnight: the previous evening in US time zones.
+5. **Identity without accounts.** The same first + last name (trimmed, case-insensitive) is the same customer, and a customer's pet is identified by name + animal type. In production these would be signed-in user and pet ids.
+6. **Names are 1–50 characters** after trimming.
+7. **Prices come from the (mock) server.** The rate card is in the database, money is stored in integer cents, and each booking keeps a snapshot of its price, so a later rate change doesn't alter past totals.
+8. **Bookings are confirmed when created.** Cancelled bookings stay listed but free up their time slot.
+9. **Out of scope:** sitter availability and assignment, payments, and authentication for the admin page.
+10. **Seed dates are fixed** (September to October 2026, in `America/New_York`).
 
 ## Testing
 
-| Layer | Tool           | Where                      | Covers now                                                                                                                              |
-| ----- | -------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| Unit  | Vitest         | `shared/src/**/*.test.ts`  | The mock database seed: 2 of each animal, valid references, 2–8 hours, the daily limit. The pricing engine's tests go here.              |
-| E2E   | Playwright     | `web/e2e/`                 | Smoke test: tokens reach MUI and Tailwind, and a Tailwind class overrides MUI's default. Booking form and admin page tests go here.     |
-| CI    | GitHub Actions | `.github/workflows/ci.yml` | `npm run verify` plus the E2E tests on every push to `main` and every pull request.                                                    |
+| Layer | Tool           | Where                      | Covers now                                                                                                                                                                                                  |
+| ----- | -------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit  | Vitest         | `shared/src/**/*.test.ts`  | The booking form's rules (against a fixed clock), the strict date and time format checks, and the mock database seed (2 of each animal, valid references, no double-booked pets). The pricing engine's tests go here. |
+| E2E   | Playwright     | `web/e2e/`                 | Smoke test: tokens reach MUI and Tailwind, a Tailwind class overrides MUI, and React Hook Form runs. The browser's time zone is fixed to `America/New_York`. Booking form and admin page tests go here.     |
+| CI    | GitHub Actions | `.github/workflows/ci.yml` | `npm run verify` plus the E2E tests on every push to `main` and every pull request.                                                                                                                        |
 
 The mobile app is checked by the TypeScript typecheck, `npx expo-doctor` and an iOS bundle, and the starter screen has been run in the iOS Simulator.
 
 ## Next steps
 
 - [ ] Pricing engine in `shared/`, with unit tests
-- [ ] Mock API client in `shared/`: async calls with simulated latency against a copy of the mock database (quote, create booking, list bookings)
-- [ ] Finish `useBookingForm`: validation against `BOOKING_RULES` (including the per-pet daily limit), a debounced live quote, and submit
-- [ ] Web: routing, `WebBookingPage` and `WebAdminPage`
-- [ ] Mobile: navigation, `MobileBookingScreen` and `MobileAdminScreen`
+- [ ] Mock API client in `shared/`: async calls with simulated latency against a copy of the mock database (quote, create booking, list bookings). Creating a booking should re-check the request with `bookingFormSchema`, reject a pet's overlapping bookings, and record `timeZone` from `getDeviceTimeZone()`
+- [ ] Finish `useBookingForm`: a debounced live quote, and submit
+- [ ] Web: routing, `WebBookingPage` (MUI inputs with `<Controller />`, including date and time pickers) and `WebAdminPage`
+- [ ] Mobile: navigation, `MobileBookingScreen` (Paper inputs with `<Controller />`, including date and time pickers) and `MobileAdminScreen`
 - [ ] E2E tests for the booking form and admin page
 - [ ] Delete the starter page, starter screen and smoke test
 
@@ -126,9 +145,9 @@ The mobile app is checked by the TypeScript typecheck, `npx expo-doctor` and an 
 
 The assessment allows AI tools as long as their use is documented. Every prompt is logged verbatim under [Prompts](#prompts), with its use case and what the AI did.
 
-| Tool                                       | What it helped with                                                                          |
-| ------------------------------------------ | -------------------------------------------------------------------------------------------- |
-| Claude Code (desktop app, Claude Opus 5.5) | Researching the role and assessment, setting up the monorepo boilerplate, drafting this README. |
+| Tool                                       | What it helped with                                                                                                                                  |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Claude Code (desktop app, Claude Opus 5.5) | Researching the role and assessment, the monorepo boilerplate, the shared booking-form logic (React Hook Form, validation, dates and times), and drafting this README. |
 
 **Decisions I made** (from my prompts):
 
@@ -137,8 +156,12 @@ The assessment allows AI tools as long as their use is documented. Every prompt 
 - Tailwind on the web app (Prompt 1)
 - Front end only: the mock database is a JSON object, with no backend (Prompt 1)
 - Account for the same-day booking gotcha, and seed 2 of each animal (Prompt 1)
+- React Hook Form for the booking form (Prompt 2)
+- Bookings have a start time as well as a date (Prompt 2)
 
-**Corrections I made to AI output:** none yet.
+**Corrections I made to AI output:**
+
+- Replaced the AI's hand-written date and time helpers with date-fns (Prompt 3)
 
 ## Prompts
 
@@ -188,3 +211,58 @@ This prompt covers three things: starting context, the initial write to README.m
 - Ran these checks, all passing: typecheck in all three packages, lint, format check, 5 unit tests, the web production build, the E2E smoke test, an iOS Metro bundle, `expo-doctor` (21/21 checks), and the mobile starter in the iOS Simulator via Expo Go.
 - Found that this machine's default Node (23.5) is outside the supported ranges, and ran everything with Node 22.15.
 - Left the feature work (see [Next steps](#next-steps)) to be written by hand: the pricing engine, mock API, form validation and live quote, the booking and admin pages and screens, and their tests.
+
+### Prompt 2: React Hook Form, and date and time
+
+- **Tool:** Claude Code (desktop app), Claude Opus 5.5
+- **Date:** 2026-09-28
+- **Files written:** `shared/src/booking-form/` (`useBookingForm.ts` rewritten; `bookingFormSchema.ts` and its test added), `shared/src/date-time/` (new), `shared/src/domain/bookingDomain.ts`, `shared/src/mock-database/` (seed and its test), the starter page and screen, `web/playwright.config.ts`, the E2E test, the `package.json` files and this README
+
+_Verbatim._
+
+> The form needs to use react hook form: https://react-hook-form.com/
+>
+> I want the form to account for date and time.
+
+#### Use Case
+
+Two changes to the shared booking-form logic: build it on React Hook Form, and have each booking capture a start time as well as a date. Real start times also sharpen the same-day gotcha from Prompt 1: instead of a daily hour limit per pet, the rule becomes "a pet's bookings can't overlap".
+
+#### What the AI did
+
+- Installed React Hook Form 7.89 in `shared/` and both apps (hoisted to one copy, like React), plus zod 4 and `@hookform/resolvers` in `shared/`.
+- **Chose zod for validation**, which the prompt didn't ask for: a schema in `shared/` plugs into React Hook Form through `zodResolver`, and the mock API can reuse it to re-check requests. React Hook Form's built-in `rules` would also work, but only inside the form. Cost: about 37 KB gzipped on the web bundle, together with React Hook Form.
+- Rewrote `useBookingForm` on `useForm`: default values, `mode: 'onTouched'`, and a subscription that re-checks the start time when the date or the number of hours changes.
+- Added `bookingFormSchema.ts`: required fields, names up to 50 characters, whole hours from 2 to 8, real calendar dates from today on, half-hour start times inside service hours (07:00–21:00), and no start time that has already passed. The cross-field checks use zod's `when` option, so they run while other fields are still empty.
+- Added `date-time/localDateTime.ts`: helpers for date and time strings, a time-overlap check, and the device's time zone.
+- Changed the data model: bookings gained `startTime`, `endTime` and `timeZone`, and the 8-hours-per-pet-per-day rule became "a pet's confirmed bookings can't overlap". Updated the seed (times on every booking, plus a rebooking after a cancellation: 9 bookings) and its tests.
+- Fixed the E2E browser's time zone to `America/New_York`, so date and time tests behave the same everywhere.
+- Ran all checks, all passing: typecheck, lint, format check, 24 unit tests, the web build, the E2E test, and the mobile starter in the iOS Simulator (React Hook Form and `Intl` time zones both work on Hermes).
+- Left the form inputs (including date and time pickers), the live quote and submit to be written by hand (see [Next steps](#next-steps)).
+
+### Prompt 3: date-fns for dates and times
+
+- **Tool:** Claude Code (desktop app), Claude Opus 5.5
+- **Date:** 2026-09-28
+- **Files written:** `shared/src/date-time/localDateTime.ts` and its test (rewritten), `shared/src/booking-form/bookingFormSchema.ts`, `shared/src/mock-database/mockDatabase.test.ts`, `shared/src/domain/bookingDomain.ts` (comments), the starter page and screen, the E2E test, `eslint.config.js`, the three `package.json` files and this README
+
+_Verbatim._
+
+> For dates and times, I'd prefer to use date-fns https://date-fns.org/. It works well with both react and react native apps. It should replace the common functions you created.
+
+#### Use Case
+
+A correction to the AI's work from Prompt 2: replace its hand-written date and time helpers with date-fns, a well-known library that works the same in React and React Native.
+
+#### What the AI did
+
+- Installed date-fns 4.4 in `shared/`, `web/` and `mobile/` (one hoisted copy).
+- Removed the hand-written helpers (`toLocalDateString`, `toLocalTimeString`, `isCalendarDate`, `isTimeOfDay`, `timeToMinutes`, `minutesToTime`, `addHours`, `timeRangesOverlap`) and moved their callers to date-fns: `format`, `parse`, `isValid`, `addHours`, `subHours`, `isBefore`, `isAfter`, `startOfToday`, `getMinutes`, and `areIntervalsOverlapping` for the no-double-booking check.
+- Kept a small `localDateTime.ts` on top of date-fns:
+  - `DATE_FORMAT` and `TIME_FORMAT`, the formats bookings store;
+  - `parseDateTime`, which turns a booking's date and time strings into a `Date`;
+  - `matchesFormat`, because date-fns `isMatch` is lenient (it accepts `'9:30'` and `'2026-1-5'`): it parses with date-fns and requires the result to format back to the same string, so stored values stay exact;
+  - `getDeviceTimeZone`, which stays on `Intl` because date-fns can't detect the device's time zone (its `@date-fns/tz` package calculates in a zone you pass in).
+- Measured the cost of importing from `'date-fns'` in the mobile app: one such import added 215 modules and about 200 KB to the iOS bundle, because Metro doesn't tree-shake. Every import now uses the function's own path (`'date-fns/format'`), and a new ESLint rule blocks the root import in all three packages.
+- Made the starter page and screen show today's date through date-fns. The E2E test fixes the browser clock with `page.clock` (along with the time zone), which is the pattern for testing date rules.
+- Ran all checks, all passing: typecheck, lint, format check, 20 unit tests, the web build, the E2E test, `expo-doctor` (21/21), and the mobile starter in the iOS Simulator (date-fns works on Hermes).

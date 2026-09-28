@@ -15,8 +15,10 @@
     "@emotion/styled": "^11.14.1",
     "@mui/material": "^9.4.0",
     "@pet-sitting/shared": "*",
+    "date-fns": "^4.4.0",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "react-hook-form": "^7.89.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",

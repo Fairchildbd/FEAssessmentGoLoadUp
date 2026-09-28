@@ -3,24 +3,32 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Platform-agnostic code used by both web/ and mobile/: design tokens, domain types, the mock database and shared form logic.",
+  "description": "Platform-agnostic code used by both web/ and mobile/: design tokens, domain types, date-time helpers, the mock database and shared form logic.",
   "exports": {
+    "./booking-form": "./src/booking-form/useBookingForm.ts",
+    "./date-time": "./src/date-time/localDateTime.ts",
     "./design-tokens": "./src/design-tokens/designTokens.ts",
     "./domain": "./src/domain/bookingDomain.ts",
-    "./mock-database": "./src/mock-database/mockDatabase.ts",
-    "./booking-form": "./src/booking-form/useBookingForm.ts"
+    "./mock-database": "./src/mock-database/mockDatabase.ts"
   },
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "@hookform/resolvers": "^5.9.1",
+    "date-fns": "^4.4.0",
+    "zod": "^4.6.5"
+  },
   "peerDependencies": {
-    "react": "^19.2.0"
+    "react": "^19.2.0",
+    "react-hook-form": "^7.89.0"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
     "react": "19.2.3",
+    "react-hook-form": "^7.89.0",
     "typescript": "~6.0.3",
     "vitest": "^5.0.2"
   }

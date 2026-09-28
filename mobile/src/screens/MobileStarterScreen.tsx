@@ -1,6 +1,9 @@
 import { useBookingForm } from '@pet-sitting/shared/booking-form';
+import { DATE_FORMAT, getDeviceTimeZone } from '@pet-sitting/shared/date-time';
 import { designTokens } from '@pet-sitting/shared/design-tokens';
 import { mockDatabase } from '@pet-sitting/shared/mock-database';
+import { format } from 'date-fns/format';
+import { useWatch } from 'react-hook-form';
 import { StyleSheet, View } from 'react-native';
 import { Button, Card, Text } from 'react-native-paper';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,7 +15,8 @@ const { color, radius, spacing, typography } = designTokens;
  * Replace it with the booking form screen (e.g. screens/MobileBookingScreen.tsx).
  */
 export function MobileStarterScreen() {
-  const { values } = useBookingForm();
+  const { control } = useBookingForm();
+  const hoursRequested = useWatch({ control, name: 'hoursRequested' });
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -30,7 +34,10 @@ export function MobileStarterScreen() {
           <Text>
             Mock database: {mockDatabase.pets.length} pets, {mockDatabase.bookings.length} bookings
           </Text>
-          <Text>useBookingForm(): hours start at {values.hoursRequested}</Text>
+          <Text>useBookingForm() (React Hook Form): hours start at {hoursRequested}</Text>
+          <Text>
+            date-fns: today is {format(new Date(), DATE_FORMAT)} in {getDeviceTimeZone()}
+          </Text>
         </Card.Content>
       </Card>
 
