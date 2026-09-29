@@ -13,7 +13,6 @@ import {
 import { getDeviceTimeZone } from '@pet-sitting/shared/date-time';
 import { createBooking, MockApiError } from '@pet-sitting/shared/mock-api';
 import { formatNameList } from '@pet-sitting/shared/domain';
-import { mockDatabase } from '@pet-sitting/shared/mock-database';
 import { useState, type ReactNode } from 'react';
 import { Controller, type Control } from 'react-hook-form';
 import { Link } from 'react-router';
@@ -21,8 +20,6 @@ import { WebPetFields } from '../booking-form/WebPetFields';
 import { WebPriceSummary } from '../booking-form/WebPriceSummary';
 import { WebServiceDateField } from '../booking-form/WebServiceDateField';
 import { WebServiceTimeField } from '../booking-form/WebServiceTimeField';
-
-const { pricingRules } = mockDatabase;
 
 export function WebBookingPage() {
   const { control, handleSubmit, formState, reset, setError, pets } = useBookingForm();
@@ -98,7 +95,7 @@ export function WebBookingPage() {
               </div>
             </FormSection>
 
-            <WebPriceSummary control={control} pricingRules={pricingRules} />
+            <WebPriceSummary control={control} />
 
             {serverError && <Alert severity="error">{serverError}</Alert>}
 

@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BookingRequest } from '../booking-form/bookingFormSchema';
-import { createBooking, listBookings, MockApiError, resetMockApi } from './mockApi';
+import {
+  createBooking,
+  getPricingRules,
+  listBookings,
+  MockApiError,
+  resetMockApi,
+} from './mockApi';
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
@@ -114,5 +120,15 @@ describe('createBooking', () => {
         'America/New_York',
       ),
     ).rejects.toThrow('Book at most 8 hours');
+  });
+});
+
+describe('getPricingRules', () => {
+  it('serves the rate card the apps price with: $20 base, then per hour pig $20, dog $10, cat $5', async () => {
+    await expect(getPricingRules()).resolves.toEqual({
+      currency: 'USD',
+      baseChargeCents: 2000,
+      hourlyRateCents: { pig: 2000, dog: 1000, cat: 500 },
+    });
   });
 });

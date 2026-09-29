@@ -1,5 +1,6 @@
 import {
   useBookingQuote,
+  usePricingRules,
   type BookingFormValues,
   type BookingRequest,
   type PetFormValues,
@@ -16,12 +17,21 @@ const { color, spacing } = designTokens;
 
 interface MobilePriceSummaryProps {
   control: Control<BookingFormValues, unknown, BookingRequest>;
-  pricingRules: PricingRules;
 }
 
-export function MobilePriceSummary({ control, pricingRules }: MobilePriceSummaryProps) {
+export function MobilePriceSummary({ control }: MobilePriceSummaryProps) {
   const pets = useWatch({ control, name: 'pets' });
+  const pricingRules = usePricingRules();
   const quote = useBookingQuote(control, pricingRules);
+
+  if (!pricingRules || !quote) {
+    return (
+      <Text variant="bodyMedium" style={styles.muted} accessibilityLiveRegion="polite">
+        Loading prices…
+      </Text>
+    );
+  }
+
   const baseCharge = formatCents(pricingRules.baseChargeCents);
   const total = formatCents(quote.totalCents);
 

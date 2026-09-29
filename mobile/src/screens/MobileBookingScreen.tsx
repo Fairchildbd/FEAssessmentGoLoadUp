@@ -7,7 +7,6 @@ import { getDeviceTimeZone } from '@pet-sitting/shared/date-time';
 import { designTokens } from '@pet-sitting/shared/design-tokens';
 import { createBooking, MockApiError } from '@pet-sitting/shared/mock-api';
 import { formatNameList } from '@pet-sitting/shared/domain';
-import { mockDatabase } from '@pet-sitting/shared/mock-database';
 import { useState, type ReactNode } from 'react';
 import { Controller, type Control } from 'react-hook-form';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
@@ -18,8 +17,6 @@ import { MobileServiceDateField } from '../booking-form/MobileServiceDateField';
 import { MobileServiceTimeField } from '../booking-form/MobileServiceTimeField';
 
 const { color, spacing } = designTokens;
-
-const { pricingRules } = mockDatabase;
 
 interface MobileBookingScreenProps {
   onShowDay: (serviceDate: string) => void;
@@ -101,7 +98,7 @@ export function MobileBookingScreen({ onShowDay }: MobileBookingScreenProps) {
               <MobileServiceTimeField control={control} />
             </Section>
 
-            <MobilePriceSummary control={control} pricingRules={pricingRules} />
+            <MobilePriceSummary control={control} />
 
             {serverError ? (
               <HelperText type="error" accessibilityRole="alert" style={styles.serverError}>

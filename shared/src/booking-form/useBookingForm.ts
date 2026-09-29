@@ -1,8 +1,9 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useFieldArray, useForm, useWatch, type Control } from 'react-hook-form';
 import { hoursBetween } from '../date-time/localDateTime';
 import type { PricingRules } from '../domain/bookingDomain';
+import { getPricingRules } from '../mock-api/mockApi';
 import { quoteBooking, type BookingQuote } from '../pricing/pricingEngine';
 import {
   bookingFormSchema,
@@ -51,11 +52,28 @@ export function useBookingForm() {
   return { ...form, pets };
 }
 
+export function usePricingRules(): PricingRules | null {
+  const [pricingRules, setPricingRules] = useState<PricingRules | null>(null);
+
+  useEffect(() => {
+    let componentStillWantsPrices = true;
+    getPricingRules().then((rules) => {
+      if (componentStillWantsPrices) setPricingRules(rules);
+    });
+    return () => {
+      componentStillWantsPrices = false;
+    };
+  }, []);
+
+  return pricingRules;
+}
+
 export function useBookingQuote(
   control: Control<BookingFormValues, unknown, BookingRequest>,
-  rules: PricingRules,
-): BookingQuote {
+  rules: PricingRules | null,
+): BookingQuote | null {
   const [pets, serviceTime] = useWatch({ control, name: ['pets', 'serviceTime'] });
+  if (!rules) return null;
   const hours = hoursBetween(serviceTime.startTime, serviceTime.endTime);
   const bothTimesPicked = hours > 0;
   return quoteBooking(

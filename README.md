@@ -56,15 +56,28 @@ SLOW_MO=500 npx playwright test --headed --workers=1
 
 The tests start the website themselves. The date is always October 1, 2026, and animations are off, so the tests behave the same every day.
 
+## Assumptions
+
+Where the assessment left details open, these are the choices I made:
+
+- **One booking can include several pets.** Someone with two dogs, like Oscar and Sulley, books them together in one request, for the same date and time. Each request shows up as one appointment on the admin page.
+- **The $20 base charge is per booking, not per pet.** One pet or twenty, it's charged once. Each pet then adds its own hourly rate, and the price lists these as separate lines rather than a formula.
+- **Hours come from a start and end time.** Instead of a separate hours field, the time picker only offers end times 2 to 8 hours after the start, in half-hour steps, so an invalid length can't be chosen.
+- **Sitters work from 7:00 AM to 9:00 PM.** Bookings start and end within those hours and must start later than the current time.
+- **A pet can't be in two places at once.** A pet's bookings can't overlap, though one can start the minute another ends. Different pets can be booked at the same time.
+- **The same first and last name is the same customer,** and a pet is known by its name and animal type, since there are no accounts.
+- **Times follow the device's time zone,** assuming people book from where their pets are.
+- **Bookings are confirmed as soon as they're made.**
+- **The admin page shows one calendar day at a time.** I chose a calendar day view because I thought it would scale better as bookings grow. A third page listing all bookings together could also make sense for the "display of all bookings" requirement.
+
 ## Limitations
 
-- **The website and the phone app don't share bookings.** Each keeps its own list, so a booking made on the website won't show up on the phone app's admin page, and the other way around. Sharing them would need a real server that both apps talk to.
+- **The website and the phone app don't share bookings.** Both call an API for prices and bookings, but that API is a stand-in built into each app, not a shared server. Each app keeps its own list, so a booking made on the website won't show up on the phone app's admin page, and the other way around. Sharing them would need a real server that both apps talk to.
 - **Bookings aren't saved.** There's no server or database, only built-in sample data. Anything you book lasts until you reload the website or restart the phone app, and then it's back to the sample data.
 - **The sample bookings are in late September and October 2026.** The admin page opens on today's date; pick 3, 5 or 10 October 2026 to see them.
-- **No accounts or sign-in.** Customers are recognized by first and last name, and anyone can open the admin page.
-- **No payments, and no sitters.** A booking is confirmed as soon as it's made; there's no checkout and no choosing or scheduling of sitters.
-- **Bookings are between 7:00 AM and 9:00 PM,** from 2 to 8 hours long, starting and ending on the hour or half hour.
-- **Times follow the device's time zone.** The app assumes people book from where their pets are.
+- **No accounts or sign-in.** Anyone can open the admin page.
+- **No payments, and no sitters.** There's no checkout and no choosing or scheduling of sitters.
+- **English only.** All text is intentionally written directly into the app instead of using i18n (translation files), so the app can't be switched to another language.
 - **The phone app has been tried on the iOS Simulator only,** not on an Android device or emulator.
 
 ## AI usage

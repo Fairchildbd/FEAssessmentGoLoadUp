@@ -2,6 +2,7 @@ import Divider from '@mui/material/Divider';
 import Typography from '@mui/material/Typography';
 import {
   useBookingQuote,
+  usePricingRules,
   type BookingFormValues,
   type BookingRequest,
   type PetFormValues,
@@ -13,12 +14,21 @@ import { useWatch, type Control } from 'react-hook-form';
 
 interface WebPriceSummaryProps {
   control: Control<BookingFormValues, unknown, BookingRequest>;
-  pricingRules: PricingRules;
 }
 
-export function WebPriceSummary({ control, pricingRules }: WebPriceSummaryProps) {
+export function WebPriceSummary({ control }: WebPriceSummaryProps) {
   const pets = useWatch({ control, name: 'pets' });
+  const pricingRules = usePricingRules();
   const quote = useBookingQuote(control, pricingRules);
+
+  if (!pricingRules || !quote) {
+    return (
+      <Typography color="text.secondary" aria-live="polite">
+        Loading prices…
+      </Typography>
+    );
+  }
+
   const baseCharge = formatCents(pricingRules.baseChargeCents);
   const total = formatCents(quote.totalCents);
 
