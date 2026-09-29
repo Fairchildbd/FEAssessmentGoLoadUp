@@ -1,5 +1,7 @@
 # Pet Sitting: LoadUp Front-End Assessment
 
+**Live website:** https://fairchildbd.github.io/FEAssessmentGoLoadUp/
+
 A pet-sitting booking app, as a website and as a phone app. Customers book a sitter for one or more pets and see the price as they go. An admin page lists each day's bookings and what the day earns.
 
 ## Running the project
@@ -83,29 +85,27 @@ Where the assessment left details open, these are the choices I made:
 
 ## AI usage
 
-The assessment allows AI tools if their use is documented. The prompts that built the app are logged verbatim under [Prompts](#prompts), each with its use case and what the AI did.
+I used **Claude Code** (desktop app, Claude Opus 5.5) as a pair programmer. It researched the assessment and LoadUp's stack, set up the project, and wrote first drafts of the code, tests and this README. I directed the work, reviewed the output and made the calls below. The prompts that shaped the app are under [Prompts](#prompts).
 
-| Tool                                       | What it helped with                                                                                                                 |
-| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------- |
-| Claude Code (desktop app, Claude Opus 5.5) | Researching the role and assessment, the monorepo boilerplate, the shared logic, the web and mobile apps, their tests, and this README |
+**My decisions**
 
-**Decisions I made:**
+- One monorepo, with logic shared between the website and the phone app
+- MUI and Tailwind on the web, React Native Paper on mobile, front end only with a mock API
+- React Hook Form for the form, date-fns for dates
+- Several pets per booking, the $20 base charged once, and exactly two "when" inputs: a tap-only date picker and one start-to-end time picker
+- Submit disabled until the form is complete, with all validation on the front end
+- An admin page by calendar day, grouped by start time, with the day's earnings
+- A matching phone app, and the website hosted on GitHub Pages
+- Code style: no comments (clear names instead), logic set up before the markup, mobile styles in style sheets
 
-- A monorepo with a `shared/` package for web and mobile (Prompt 1)
-- MUI on web, React Native Paper on mobile, shared design tokens, Tailwind on web (Prompt 1)
-- Front end only, with a JSON mock database; account for same-day bookings; 2 of each animal (Prompt 1)
-- React Hook Form, and bookings with a start time as well as a date (Prompt 2)
-- Several pets per request; exactly two "when" inputs; the $20 base once per request; itemized charges; front-end-only validation (Prompt 4)
-- An admin page grouped by start time with day switching, easy switching between pages, and a working submit (Prompt 6)
-- Submit disabled until the form is complete, and the total always showing a price (Prompt 5)
-- The day's total earnings beside the admin title (Prompt 8)
-- A mobile app matching the web app (Prompt 9)
+**Where I corrected the AI**
 
-**Corrections I made to AI output:**
-
-- Replaced hand-written date helpers with date-fns (Prompt 3)
-- The time picker offers only valid lengths, in 30-minute steps, instead of listing every length and showing errors (Prompt 5)
-- One submission is one appointment, not one booking per pet (Prompt 7)
+- Replaced hand-written date helpers with date-fns
+- Made the time picker offer only valid lengths, in 30-minute steps
+- Made one booking hold all its pets, instead of one booking per pet
+- Loaded prices through the API instead of from the sample data
+- Fixed an error showing on the form after a successful booking
+- Reworked the mobile pickers into full-screen screens and the navigation colors to match the site
 
 ## Prompts
 
