@@ -78,6 +78,7 @@ Where the assessment left details open, these are the choices I made:
 - **No accounts or sign-in.** Anyone can open the admin page.
 - **No payments, and no sitters.** There's no checkout and no choosing or scheduling of sitters.
 - **English only.** All text is intentionally written directly into the app instead of using i18n (translation files), so the app can't be switched to another language.
+- **The phone app doesn't run in a browser.** It's set up for iOS and Android only, so pressing `w` in the Expo terminal won't open it. Use `npm run web` for the website.
 - **The phone app has been tried on the iOS Simulator only,** not on an Android device or emulator.
 
 ## AI usage
