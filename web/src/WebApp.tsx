@@ -14,7 +14,7 @@ export function WebApp() {
       <ThemeProvider theme={webTheme}>
         <CssBaseline />
         <LocalizationProvider dateAdapter={AdapterDateFns}>
-          <BrowserRouter>
+          <BrowserRouter basename={import.meta.env.BASE_URL}>
             <WebNavBar />
             <Routes>
               <Route path="/" element={<WebBookingPage />} />
