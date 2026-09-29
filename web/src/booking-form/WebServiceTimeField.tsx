@@ -6,59 +6,17 @@ import MenuList from '@mui/material/MenuList';
 import Popover from '@mui/material/Popover';
 import TextField from '@mui/material/TextField';
 import type { BookingFormValues, BookingRequest } from '@pet-sitting/shared/booking-form';
+import { displayTime, formatHours, hoursBetween } from '@pet-sitting/shared/date-time';
 import {
-  displayTime,
-  hoursBetween,
-  parseDateTime,
-  TIME_FORMAT,
-} from '@pet-sitting/shared/date-time';
-import { BOOKING_RULES } from '@pet-sitting/shared/domain';
-import { addMinutes } from 'date-fns/addMinutes';
-import { format } from 'date-fns/format';
-import { isAfter } from 'date-fns/isAfter';
-import { isBefore } from 'date-fns/isBefore';
-import { parse } from 'date-fns/parse';
+  endTimeForNewStart,
+  endTimeOptions,
+  hasStartPassed,
+  startTimeOptions,
+} from '@pet-sitting/shared/service-time';
 import { useRef, useState, type KeyboardEvent } from 'react';
 import { Controller, useWatch, type Control } from 'react-hook-form';
 
-const { minHours, maxHours, serviceHours, timeStepMinutes } = BOOKING_RULES;
-
-const pluralHours = (hours: number) => `${hours} ${hours === 1 ? 'hour' : 'hours'}`;
-
-const toTime = (time: string) => parse(time, TIME_FORMAT, new Date());
-const timePlusHours = (time: string, hours: number) =>
-  format(addMinutes(toTime(time), hours * 60), TIME_FORMAT);
-
-/** Times every half hour from `first` to `last`, both included. */
-function timesBetween(first: Date, last: Date): string[] {
-  const options: string[] = [];
-  for (let time = first; !isAfter(time, last); time = addMinutes(time, timeStepMinutes)) {
-    options.push(format(time, TIME_FORMAT));
-  }
-  return options;
-}
-
-/** Every half hour from opening until the last start that still fits the minimum before closing. */
-const START_TIMES = timesBetween(
-  toTime(serviceHours.start),
-  addMinutes(toTime(serviceHours.end), -minHours * 60),
-);
-
-/**
- * Every half hour from 2 to 8 hours after the start, stopping at closing. Nothing shorter or longer
- * is offered, so the user can't pick a length outside the limits.
- */
-function endTimeOptions(startTime: string): string[] {
-  if (!startTime) return [];
-  const start = toTime(startTime);
-  const closing = toTime(serviceHours.end); // same day as `start`, so they compare correctly
-  // Compared as Dates: as 'HH:mm' strings, 18:00 + 8 hours would wrap around to '02:00'.
-  const latest = addMinutes(start, maxHours * 60);
-  return timesBetween(
-    addMinutes(start, minHours * 60),
-    isAfter(latest, closing) ? closing : latest,
-  );
-}
+const START_TIMES = startTimeOptions();
 
 interface WebServiceTimeFieldProps {
   control: Control<BookingFormValues, unknown, BookingRequest>;
@@ -73,10 +31,6 @@ export function WebServiceTimeField({ control }: WebServiceTimeFieldProps) {
   const anchorRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const serviceDate = useWatch({ control, name: 'serviceDate' });
-
-  // On today's date, start times that have passed can't be picked.
-  const hasPassed = (startTime: string) =>
-    serviceDate !== '' && isBefore(parseDateTime(serviceDate, startTime), new Date());
 
   return (
     <Controller
@@ -94,10 +48,10 @@ export function WebServiceTimeField({ control }: WebServiceTimeFieldProps) {
 
         const pickStart = (newStart: string) => {
           // Keep the same number of hours if they still fit before closing; otherwise pick again.
-          const previousHours = hoursBetween(startTime, endTime);
-          const keptEnd = previousHours > 0 ? timePlusHours(newStart, previousHours) : '';
-          const newEnd = endTimeOptions(newStart).includes(keptEnd) ? keptEnd : '';
-          field.onChange({ startTime: newStart, endTime: newEnd });
+          field.onChange({
+            startTime: newStart,
+            endTime: endTimeForNewStart(field.value, newStart),
+          });
         };
 
         const pickEnd = (newEnd: string) => {
@@ -131,7 +85,7 @@ export function WebServiceTimeField({ control }: WebServiceTimeFieldProps) {
               onClick={() => setOpen(true)}
               onKeyDown={openOnKey}
               error={Boolean(fieldState.error)}
-              helperText={fieldState.error?.message ?? (hasRange ? pluralHours(hours) : undefined)}
+              helperText={fieldState.error?.message ?? (hasRange ? formatHours(hours) : undefined)}
               slotProps={{
                 inputLabel: { shrink: open || startTime !== '' || undefined },
                 input: {
@@ -169,7 +123,7 @@ export function WebServiceTimeField({ control }: WebServiceTimeFieldProps) {
                     <MenuItem
                       key={time}
                       selected={time === startTime}
-                      disabled={hasPassed(time)}
+                      disabled={hasStartPassed(serviceDate, time)} // on today's date
                       onClick={() => pickStart(time)}
                     >
                       {displayTime(time)}
@@ -195,7 +149,7 @@ export function WebServiceTimeField({ control }: WebServiceTimeFieldProps) {
                       >
                         {displayTime(time)}
                         <span className="ml-sm text-body-small text-on-surface-variant">
-                          {pluralHours(hoursBetween(startTime, time))}
+                          {formatHours(hoursBetween(startTime, time))}
                         </span>
                       </MenuItem>
                     ))

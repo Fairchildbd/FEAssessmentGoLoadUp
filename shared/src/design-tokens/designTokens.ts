@@ -65,6 +65,12 @@ const color = {
   onWarning: palette.white,
   info: palette.blue700,
   onInfo: palette.white,
+  // Navigation (web header, mobile tab bar): the primary green, with a soft gray pill marking the
+  // current page. Dark teal on the pill reads at 7:1; the primary teal would only reach 4:1.
+  navigationBar: palette.teal800,
+  onNavigationBar: palette.white,
+  navigationIndicator: palette.gray200,
+  onNavigationIndicator: palette.teal900,
 } as const;
 
 /** Spacing on a 4px grid. */

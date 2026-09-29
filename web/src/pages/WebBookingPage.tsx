@@ -8,6 +8,7 @@ import Typography from '@mui/material/Typography';
 import { useBookingForm, type BookingRequest } from '@pet-sitting/shared/booking-form';
 import { getDeviceTimeZone } from '@pet-sitting/shared/date-time';
 import { createBooking, MockApiError } from '@pet-sitting/shared/mock-api';
+import { formatNameList } from '@pet-sitting/shared/domain';
 import { mockDatabase } from '@pet-sitting/shared/mock-database';
 import { useState, type ReactNode } from 'react';
 import { Controller } from 'react-hook-form';
@@ -20,9 +21,6 @@ import { WebServiceTimeField } from '../booking-form/WebServiceTimeField';
 // The rate card from the mock database's seed, read directly for the live price. Bookings are saved
 // through the mock API, which prices them from the same rate card.
 const { pricingRules } = mockDatabase;
-
-/** ['Oscar', 'Sulley'] -> 'Oscar and Sulley' */
-const listFormat = new Intl.ListFormat('en', { type: 'conjunction' });
 
 /** The booking form: who you are, your pets, when, and the live price. Validation is all client-side. */
 export function WebBookingPage() {
@@ -58,7 +56,7 @@ export function WebBookingPage() {
 
       {submitted && (
         <Alert severity="success" onClose={() => setSubmitted(null)} className="mt-lg">
-          Booked {listFormat.format(submitted.pets.map((pet) => pet.name))}.{' '}
+          Booked {formatNameList(submitted.pets.map((pet) => pet.name))}.{' '}
           <Link to={`/admin?date=${submitted.serviceDate}`}>See the day's bookings</Link>
         </Alert>
       )}

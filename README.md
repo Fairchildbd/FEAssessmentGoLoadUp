@@ -2,7 +2,7 @@
 
 A pet-sitting booking app built as a monorepo: a **React** web app and a **React Native** app that share one TypeScript package for design tokens, domain types, the mock database and form logic. It is front end only; there is no backend in this repo.
 
-> **Status:** the web booking form works: several pets per request, a click-only date picker, a start-to-end time picker that only offers 2 to 8 hours in half-hour steps, all-client-side validation and a live itemized price. Submitting saves through the mock API, which refuses a pet's overlapping bookings, and the admin page lists each day's bookings grouped by start time. The mobile screens are next (see [Next steps](#next-steps)).
+> **Status:** the booking form and admin page work on web and mobile alike: several pets per request, a click-only date picker, a start-to-end time picker that only offers 2 to 8 hours in half-hour steps, all-client-side validation and a live itemized price. Submitting saves through the mock API, which refuses a pet's overlapping bookings, and the admin page lists each day's bookings grouped by start time, with the day's earnings. See [Mobile](#mobile-matching-the-web-app) for how the phone version maps onto the web one.
 
 ## Quick start
 
@@ -17,7 +17,7 @@ npm run mobile    # Expo dev server only; scan the QR code with Expo Go on a pho
 ```
 
 ```bash
-npm run verify    # typecheck + lint + format check + unit tests + web build
+npm run verify    # typecheck + lint + format check + unit tests (shared and mobile) + web build
 npm run test:e2e  # Playwright E2E tests (first time: cd web && npx playwright install chromium)
 ```
 
@@ -25,7 +25,7 @@ npm run test:e2e  # Playwright E2E tests (first time: cd web && npx playwright i
 
 ```text
 shared/                  @pet-sitting/shared: platform-agnostic code used by both apps
-  src/booking-form/      useBookingForm.ts (React Hook Form) and bookingFormSchema.ts (validation)
+  src/booking-form/      useBookingForm.ts (React Hook Form), bookingFormSchema.ts (validation), serviceTimeOptions.ts (the time picker's lists)
   src/date-time/         localDateTime.ts: the date and time formats bookings use, for date-fns
   src/design-tokens/     designTokens.ts: colors, spacing, radius, type scale
   src/domain/            bookingDomain.ts: data types and business rules
@@ -42,9 +42,12 @@ web/                     @pet-sitting/web: React, Vite, MUI, Tailwind
   tailwind.config.ts     Tailwind theme built from the shared tokens
   e2e/                   Playwright tests
 mobile/                  @pet-sitting/mobile: React Native, Expo, React Native Paper
-  src/MobileApp.tsx      root component: Paper theme and providers
+  src/MobileApp.tsx      root component: Paper theme, providers and the two tabs
   src/screens/           Mobile*Screen.tsx
+  src/booking-form/      the booking form's inputs and price summary (Mobile*Field.tsx, MobilePriceSummary.tsx)
+  src/components/        MobileDatePicker.tsx (used by the form and the admin screen)
   src/theme/             mobileTheme.ts (Paper)
+  src/__tests__/         Jest + React Native Testing Library tests
 ```
 
 ### Which app am I in?
@@ -94,6 +97,23 @@ shared/src/booking-form/bookingFormSchema.ts     zod schema: every field rule, i
 - **Saved until the page reloads.** The two pages are routes in one app (React Router), so moving between them keeps the saved bookings; a reload starts again from the seed.
 
 The admin page (`/admin?date=YYYY-MM-DD`, default today) shows the day's total earnings on the title's line, right-aligned (confirmed bookings only: a cancelled booking earns nothing), then one card per start time, earliest first, titled like "3 appointments starting at 7:00 AM", with each appointment under the customer's name: its times, hours and number of pets, every pet with its charge, the base charge and the total. Cancelled bookings are listed with a "Cancelled" tag. Days change with the same `WebDatePicker` the form uses (past dates allowed here) or the previous and next buttons, and the date lives in the URL so the browser's back button steps through days. The grouping (`groupByStartTime`), the day's earnings (`dayEarningsCents`) and loading (`useDaySchedule`) are in `shared/`, ready for the mobile admin screen.
+
+## Mobile: matching the web app
+
+The mobile app does everything the web app does, with the same shared hook, schema, time lists, pricing, mock API and schedule. Only the inputs and layout are platform code.
+
+| Web                                                  | Mobile                                                                                                 |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Nav bar with "Book a sitter" and "Admin" tabs         | Paper `BottomNavigation` with the same two tabs (no navigation library needed)                          |
+| `WebDatePicker`: MUI X, read-only, opens on any click | `MobileDatePicker`: a read-only field that opens `react-native-paper-dates` on any tap                  |
+| Time popover with Start and End columns               | A Paper modal with the same two columns, from the same `serviceTimeOptions.ts`                          |
+| Animal type as a select                               | Animal type as segmented buttons (one tap on a phone)                                                   |
+| Success message links to `/admin?date=…`              | Success banner's "See the day's bookings" opens the Admin tab on that date                             |
+| Admin page reloads on each visit                      | The Admin tab remounts each time it opens, so it shows bookings made since                              |
+
+- **Both tabs stay mounted**, so a half-filled form survives a look at the schedule. The mock API's saved bookings live as long as the app runs.
+- **Text that both apps show comes from `shared/`**: `displayTime`, `formatHours`, `formatCents` and `formatNameList`. `formatNameList` exists because `Intl.ListFormat` isn't in every React Native JavaScript engine.
+- Paper's icons come from `@expo/vector-icons`.
 
 ## Styling: shared tokens, platform themes
 
@@ -154,9 +174,10 @@ Where the assessment is silent, these are the working assumptions. The data mode
 | ----- | -------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Unit  | Vitest         | `shared/src/**/*.test.ts`  | The booking form's rules (against a fixed clock), the pricing engine (base charge once per request), the mock API (one booking per submission, overlap refusals, the itemized price), grouping by start time, the day's earnings, the strict date and time format checks, and the mock database seed (2 of each animal, valid references, prices that add up, no double-booked pets). |
 | E2E   | Playwright     | `web/e2e/`                 | The booking form: the date opens from anywhere on the field and can't be typed in, the End column offers only 2 to 8 hours in half-hour steps and stops at closing, submit stays disabled until every input is filled in, the total for several pets charges the base once, and a complete request submits. The admin page: the day's earnings beside the title; grouping by start time, earliest first; switching days; a submitted request appearing on it; and an overlapping booking refused. The browser's time zone and clock are fixed, and reduced motion is on (the date picker ignores clicks during its opening animation, which only a test is fast enough to make). |
+| Mobile | Jest (jest-expo) + React Native Testing Library | `mobile/src/__tests__/` | The same behaviors as the web E2E tests, on the phone: the tap-only date field, the time lists, live pricing, submit enabled only when complete, saving and the admin schedule (grouping, switching days, earnings, a four-pet appointment, an overlap refused). Helpers in `mobile/src/test-utils/` send the layout events that the calendar and Paper's tab bar wait for, since Jest has no layout engine. |
 | CI    | GitHub Actions | `.github/workflows/ci.yml` | `npm run verify` plus the E2E tests on every push to `main` and every pull request.                                                                                                                        |
 
-The mobile app is checked by the TypeScript typecheck, `npx expo-doctor` and an iOS bundle, and the starter screen has been run in the iOS Simulator.
+The mobile app is also checked by its TypeScript typecheck, and the booking and admin screens have been run in the iOS Simulator (iPhone 17 Pro) through Expo Go.
 
 ## Next steps
 
@@ -166,11 +187,11 @@ The mobile app is checked by the TypeScript typecheck, `npx expo-doctor` and an 
 - [x] Submit: send the request through the mock API, and handle overlapping bookings for each pet
 - [x] Web: `WebBookingPage` (MUI inputs with `<Controller />`, including date and time pickers)
 - [x] Web: routing and `WebAdminPage`
-- [ ] Mobile: navigation, `MobileBookingScreen` (Paper inputs with `<Controller />`, including date and time pickers) and `MobileAdminScreen`
+- [x] Mobile: navigation, `MobileBookingScreen` (Paper inputs with `<Controller />`, including date and time pickers) and `MobileAdminScreen`
 - [x] E2E tests for the booking form
 - [x] E2E tests for the admin page
 - [x] Delete the web starter page and smoke test
-- [ ] Delete the mobile starter screen
+- [x] Delete the mobile starter screen
 
 ## AI usage
 
@@ -199,6 +220,7 @@ The assessment allows AI tools as long as their use is documented. Every prompt 
 - Replaced the AI's time picker, which listed every length and relied on errors, with one that only offers valid lengths; and asked for half-hour end times instead of whole hours (Prompt 5)
 - Changed the AI's one-booking-per-pet design: one submission is one appointment, with all its pets under the customer's name (Prompt 7)
 - The day's total earnings at the top of the admin page, right-aligned with the "Bookings" title (Prompt 8)
+- The mobile app matching the web app's functionality (Prompt 9)
 
 ## Prompts
 
@@ -445,3 +467,26 @@ Show what the selected day earns at the top of the admin page, on the same line 
 - Added `dayEarningsCents` in `shared/src/booking-schedule/`: the sum of the day's confirmed bookings' totals. **Chose to leave cancelled bookings out**, which the prompt didn't specify, since a cancelled booking earns nothing: 10 October shows $180, not $320.
 - Put the amount beside the title on the admin page, with "Total earnings" under it, lined up with the date under the title. It shows "…" while the day loads and $0 on a day without bookings.
 - Added 3 unit tests (46 in total) and E2E checks for the amount on several days (including after a new booking) and for its position: the same line as the title, at the schedule's right edge. Ran all checks, all passing: typecheck, lint, format check, 46 unit tests, the web build and 9 E2E tests. Checked the header in screenshots at desktop and phone widths.
+
+### Prompt 9: Mobile matches web
+
+- **Tool:** Claude Code (desktop app), Claude Opus 5.5
+- **Date:** 2026-09-28
+- **Files written:** `mobile/src/` (new: `MobileApp.tsx` rewritten, `screens/MobileBookingScreen.tsx`, `screens/MobileAdminScreen.tsx`, `booking-form/`, `components/MobileDatePicker.tsx`, `__tests__/`, `test-utils/`; the starter screen deleted), `mobile/jest.config.js`, `mobile/jest.setup.ts`, `mobile/tsconfig.json`, `mobile/package.json`, `shared/src/booking-form/serviceTimeOptions.ts` and its test (moved from the web time field), `shared/src/date-time/localDateTime.ts` (`formatHours`), `shared/src/domain/bookingDomain.ts` and a new test (`formatNameList`), `shared/package.json`, the web files that now use the shared helpers, the root `package.json` (React override), `package-lock.json` and this README
+
+_Verbatim._
+
+> Next, I want mobile to match the web functionality.
+
+#### Use Case
+
+Bring the React Native app up to the web app: the same booking form (several pets, tap-only date, start-to-end time, live price, submit only when complete) and the same admin schedule (grouped by start time, day switching, earnings), with easy switching between the two.
+
+#### What the AI did
+
+- **Shared first:** moved the time picker's lists (`startTimeOptions`, `endTimeOptions`, keeping the length when the start changes, passed start times) from the web component into `shared/src/booking-form/serviceTimeOptions.ts` with tests, and added `formatHours` and `formatNameList`, so both apps show the same choices and text. The web app uses them too.
+- **Mobile screens** with React Native Paper: `MobileBookingScreen` (name fields, pet blocks with segmented animal-type buttons, `MobileDatePicker`, a two-column time modal, the price summary, a success banner that opens the day on the Admin tab, the server's error kept on the form) and `MobileAdminScreen` (earnings beside the title, the date picker with previous and next buttons, cards per start time with each appointment itemized). Two tabs with Paper's `BottomNavigation`; the Admin tab remounts each time it opens so new bookings show.
+- **New dependencies:** `react-native-paper-dates` (a Paper-styled calendar in plain JavaScript, so it runs in Expo Go) and `@expo/vector-icons` (Paper's icons) in the app; Jest 29, jest-expo, React Native Testing Library 14 and `test-renderer` for tests. `npm audit` reports 10 moderate advisories, all from Expo's own tooling (`xcode` → `uuid`) and present before this prompt.
+- **Found and fixed:** installing the mobile packages let npm put React 19.3.0 at the root while react-dom stayed 19.2.3, which stopped the web app from starting (the E2E tests caught it). Added a root `overrides` entry that pins `react` and `react-dom` to 19.2.3, as the README already promised.
+- **Mobile tests (9):** each web E2E test has a mobile counterpart. Getting them to run needed: compiling `react-native-paper-dates`' ES-module color packages in Jest, the safe-area library's Jest mock, sending layout events (the calendar and Paper's tab bar do nothing until measured), explicit accessibility labels on the name fields and tabs (which also helps VoiceOver), and `"types": ["jest"]` in the mobile tsconfig, because TypeScript 6 no longer loads `@types` packages on its own.
+- Ran all checks, all passing: typecheck, lint, format check, 54 shared unit tests, 9 mobile tests, the web build and 9 web E2E tests. Ran the app in the iOS Simulator (iPhone 17 Pro, Expo Go) and screenshotted the booking and admin screens. The admin screenshot needed the app to start on that tab at a seeded date, a temporary change that was reverted.

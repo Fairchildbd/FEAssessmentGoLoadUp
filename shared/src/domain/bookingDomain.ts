@@ -9,6 +9,16 @@
 export const ANIMAL_TYPES = ['dog', 'cat', 'pig'] as const;
 export type AnimalType = (typeof ANIMAL_TYPES)[number];
 
+/**
+ * Names as one phrase: ['Oscar'] -> 'Oscar', ['Oscar', 'Sulley'] -> 'Oscar and Sulley', three or
+ * more -> 'Oscar, Sulley, and Babe'. Written out because Intl.ListFormat isn't in every React
+ * Native JavaScript engine.
+ */
+export function formatNameList(names: readonly string[]): string {
+  if (names.length <= 2) return names.join(' and ');
+  return `${names.slice(0, -1).join(', ')}, and ${names.at(-1)}`;
+}
+
 /** How each animal type reads in the apps. */
 export const ANIMAL_TYPE_LABELS: Record<AnimalType, string> = {
   dog: 'Dog',

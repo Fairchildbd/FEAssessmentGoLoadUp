@@ -115,4 +115,29 @@ test('keeps submit disabled until every input is filled in', async ({ page }) =>
 
   await submitButton(page).click();
   await expect(page.getByRole('alert')).toContainText('Booked Oscar and Sulley.');
+
+  // The form starts over clean: empty, and with no errors (the time used to say "Choose a start
+  // and end time" here).
+  await expect(page.getByRole('textbox', { name: 'Time' })).toHaveValue('');
+  await expect(page.getByText('Choose a start and end time', { exact: true })).toHaveCount(0);
+  await expect(page.locator('.Mui-error')).toHaveCount(0);
+});
+
+test('colors the header primary green, with a soft gray pill on the current page', async ({
+  page,
+}) => {
+  const header = page.getByRole('banner');
+  await expect(header).toHaveCSS('background-color', 'rgb(8, 122, 119)'); // primary (#087a77)
+
+  const current = page.getByRole('tab', { name: 'Book a sitter' });
+  const other = page.getByRole('tab', { name: 'Admin' });
+  await expect(current).toHaveCSS('background-color', 'rgb(226, 226, 226)'); // gray200
+  await expect(current).toHaveCSS('color', 'rgb(11, 79, 77)'); // teal900 on the pill
+  await expect(other).toHaveCSS('color', 'rgb(255, 255, 255)'); // white on the green
+  await expect(other).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+
+  // The pill moves with the page.
+  await other.click();
+  await expect(other).toHaveCSS('background-color', 'rgb(226, 226, 226)');
+  await expect(current).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
 });

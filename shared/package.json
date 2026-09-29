@@ -6,6 +6,7 @@
   "description": "Platform-agnostic code used by both web/ and mobile/: design tokens, domain types, date-time helpers, the mock database, pricing engine and shared form logic.",
   "exports": {
     "./booking-form": "./src/booking-form/useBookingForm.ts",
+    "./service-time": "./src/booking-form/serviceTimeOptions.ts",
     "./date-time": "./src/date-time/localDateTime.ts",
     "./design-tokens": "./src/design-tokens/designTokens.ts",
     "./domain": "./src/domain/bookingDomain.ts",

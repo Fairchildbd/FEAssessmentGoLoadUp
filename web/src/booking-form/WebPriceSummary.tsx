@@ -6,6 +6,7 @@ import {
   type BookingRequest,
 } from '@pet-sitting/shared/booking-form';
 import { ANIMAL_TYPE_LABELS, type PricingRules } from '@pet-sitting/shared/domain';
+import { formatHours } from '@pet-sitting/shared/date-time';
 import { formatCents } from '@pet-sitting/shared/pricing';
 import { useWatch, type Control } from 'react-hook-form';
 
@@ -13,8 +14,6 @@ interface WebPriceSummaryProps {
   control: Control<BookingFormValues, unknown, BookingRequest>;
   pricingRules: PricingRules;
 }
-
-const pluralHours = (hours: number) => `${hours} ${hours === 1 ? 'hour' : 'hours'}`;
 
 /**
  * The itemized price: each pet with its hours and hourly rate listed under its name, the base
@@ -48,7 +47,7 @@ export function WebPriceSummary({ control, pricingRules }: WebPriceSummaryProps)
                     <div>Choose an animal type</div>
                   ) : (
                     <>
-                      <div>{petQuote ? pluralHours(petQuote.hours) : 'Choose a time'}</div>
+                      <div>{petQuote ? formatHours(petQuote.hours) : 'Choose a time'}</div>
                       <div>
                         {formatCents(pricingRules.hourlyRateCents[pet.animalType])} per hour
                       </div>

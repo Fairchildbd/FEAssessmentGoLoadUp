@@ -16,7 +16,12 @@ import {
   type StartTimeGroup,
 } from '@pet-sitting/shared/booking-schedule';
 import type { BookingListItem } from '@pet-sitting/shared/mock-api';
-import { DATE_FORMAT, displayTime, matchesFormat } from '@pet-sitting/shared/date-time';
+import {
+  DATE_FORMAT,
+  displayTime,
+  formatHours,
+  matchesFormat,
+} from '@pet-sitting/shared/date-time';
 import { ANIMAL_TYPE_LABELS } from '@pet-sitting/shared/domain';
 import { formatCents } from '@pet-sitting/shared/pricing';
 import { addDays } from 'date-fns/addDays';
@@ -25,8 +30,6 @@ import { parse } from 'date-fns/parse';
 import { Fragment } from 'react';
 import { useSearchParams } from 'react-router';
 import { WebDatePicker } from '../components/WebDatePicker';
-
-const pluralHours = (hours: number) => `${hours} ${hours === 1 ? 'hour' : 'hours'}`;
 
 /**
  * The day's date is in the URL (/admin?date=2026-10-03), so a day can be linked to and the browser's
@@ -159,7 +162,7 @@ function AppointmentItem({ item: { booking, customer, pets } }: { item: BookingL
           <Typography className="font-medium">{customerName}</Typography>
           <div className="text-body-small text-on-surface-variant">
             {displayTime(booking.startTime)} – {displayTime(booking.endTime)} ·{' '}
-            {pluralHours(booking.hoursRequested)} ·{' '}
+            {formatHours(booking.hoursRequested)} ·{' '}
             {pets.length === 1 ? '1 pet' : `${pets.length} pets`}
           </div>
         </div>

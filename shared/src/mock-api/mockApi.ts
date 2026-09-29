@@ -18,9 +18,11 @@ function copyOfSeed(): MockDatabase {
   return JSON.parse(JSON.stringify(mockDatabase)) as MockDatabase;
 }
 
-/** Waits like a network round trip would. */
+/** Waits like a network round trip would. With no latency, answers without a timer at all. */
 const respond = <Value>(value: Value) =>
-  new Promise<Value>((resolve) => setTimeout(() => resolve(value), latencyMs));
+  latencyMs === 0
+    ? Promise.resolve(value)
+    : new Promise<Value>((resolve) => setTimeout(() => resolve(value), latencyMs));
 
 /** Starts over from the seed data. Tests use it, with no latency, to run each case from scratch. */
 export function resetMockApi(options: { latencyMs?: number } = {}): void {

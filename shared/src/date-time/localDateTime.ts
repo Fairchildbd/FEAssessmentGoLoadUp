@@ -22,6 +22,11 @@ export function displayTime(time: string): string {
   return format(parse(time, TIME_FORMAT, new Date()), 'h:mm a');
 }
 
+/** A number of hours as people read it: formatHours(1) is '1 hour', formatHours(2.5) '2.5 hours'. */
+export function formatHours(hours: number): string {
+  return `${hours} ${hours === 1 ? 'hour' : 'hours'}`;
+}
+
 /** A booking's local date and time as a Date, e.g. parseDateTime('2026-10-03', '09:30'). */
 export function parseDateTime(date: string, time: string): Date {
   return parse(`${date} ${time}`, `${DATE_FORMAT} ${TIME_FORMAT}`, new Date());

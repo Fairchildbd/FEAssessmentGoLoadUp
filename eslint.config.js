@@ -62,6 +62,23 @@ export default defineConfig(
       ],
     },
   },
+  {
+    // Mobile styles live in StyleSheet.create, not inline objects: they're named, created once
+    // instead of on every render, and kept together at the bottom of each file. Matches any
+    // style-like prop (style, contentStyle, contentContainerStyle, ...) given an object literal,
+    // directly or inside an array.
+    files: ['mobile/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            'JSXAttribute[name.name=/[sS]tyle$/] > JSXExpressionContainer > ObjectExpression, JSXAttribute[name.name=/[sS]tyle$/] > JSXExpressionContainer > ArrayExpression > ObjectExpression',
+          message: 'Move this style into a StyleSheet.create at the bottom of the file.',
+        },
+      ],
+    },
+  },
   // Last, so formatting is left to Prettier.
   prettier,
 );

@@ -37,14 +37,18 @@ export function useBookingForm() {
   const pets = useFieldArray({ control, name: 'pets' });
 
   // A start time can pass depending on the date (today vs. tomorrow), so check the time again when
-  // the date changes (once the user has touched the time).
+  // the user changes the date (once they've touched the time). Only a user's change counts: reset()
+  // after a booking also notifies here, before the time's touched state is cleared, and checking
+  // the emptied time then would show "Choose a start and end time" on a fresh form.
   useEffect(
     () =>
       subscribe({
         name: 'serviceDate',
         formState: { values: true },
-        callback: () => {
-          if (getFieldState('serviceTime').isTouched) void trigger('serviceTime');
+        callback: ({ type }) => {
+          if (type === 'change' && getFieldState('serviceTime').isTouched) {
+            void trigger('serviceTime');
+          }
         },
       }),
     [subscribe, getFieldState, trigger],
