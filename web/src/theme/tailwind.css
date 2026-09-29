@@ -1,11 +1,3 @@
-/*
- * Tailwind v3 entry point, imported once in main.tsx.
- *
- * `base` only adds Tailwind's CSS variables here, because preflight is off (see tailwind.config.ts).
- * None of these rules are in a CSS cascade layer, while MUI's styles are (see WebApp.tsx). Unlayered
- * rules beat layered ones, so a Tailwind class always overrides MUI's default styles, without
- * needing !important.
- */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;

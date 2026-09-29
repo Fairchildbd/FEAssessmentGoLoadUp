@@ -4,10 +4,6 @@ import { toRem } from './toRem';
 
 const { color, radius, typography } = designTokens;
 
-/**
- * Web-only styling: the shared design tokens mapped onto MUI's theme. Tailwind reads the same
- * tokens in web/tailwind.config.ts, so MUI components and Tailwind classes always agree.
- */
 export const webTheme = createTheme({
   palette: {
     primary: { main: color.primary, contrastText: color.onPrimary },
@@ -22,7 +18,6 @@ export const webTheme = createTheme({
   },
   shape: { borderRadius: radius.control },
   typography: {
-    // System fonts load instantly and look native on every OS.
     fontFamily: 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
     h4: {
       fontSize: toRem(typography.fontSize.display),
@@ -45,14 +40,11 @@ export const webTheme = createTheme({
       lineHeight: typography.lineHeight.normal,
     },
     caption: { fontSize: toRem(typography.fontSize.caption) },
-    // MUI buttons default to UPPERCASE; LoadUp's site uses sentence case.
     button: { textTransform: 'none', fontWeight: typography.fontWeight.medium },
   },
   components: {
     MuiOutlinedInput: {
       styleOverrides: {
-        // MUI's default input border is about 1.7:1 against white. The outline token meets the
-        // 3:1 minimum WCAG sets for the edges of form controls.
         notchedOutline: { borderColor: color.outline },
       },
     },

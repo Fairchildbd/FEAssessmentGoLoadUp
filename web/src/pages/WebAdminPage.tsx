@@ -22,7 +22,7 @@ import {
   formatHours,
   matchesFormat,
 } from '@pet-sitting/shared/date-time';
-import { ANIMAL_TYPE_LABELS } from '@pet-sitting/shared/domain';
+import { ANIMAL_TYPE_LABELS, type Pet } from '@pet-sitting/shared/domain';
 import { formatCents } from '@pet-sitting/shared/pricing';
 import { addDays } from 'date-fns/addDays';
 import { format } from 'date-fns/format';
@@ -31,10 +31,6 @@ import { Fragment } from 'react';
 import { useSearchParams } from 'react-router';
 import { WebDatePicker } from '../components/WebDatePicker';
 
-/**
- * The day's date is in the URL (/admin?date=2026-10-03), so a day can be linked to and the browser's
- * back button steps through the days viewed. Without one, the page shows today.
- */
 function useSelectedDate(): [string, (date: string) => void] {
   const [searchParams, setSearchParams] = useSearchParams();
   const fromUrl = searchParams.get('date') ?? '';
@@ -43,13 +39,22 @@ function useSelectedDate(): [string, (date: string) => void] {
   return [date, setDate];
 }
 
-/** Admin: one day's bookings, grouped by start time, earliest first. */
 export function WebAdminPage() {
   const [date, setDate] = useSelectedDate();
   const { schedule, reload } = useDaySchedule(date);
 
-  const shiftDay = (days: number) =>
-    setDate(format(addDays(parse(date, DATE_FORMAT, new Date()), days), DATE_FORMAT));
+  const selectedDay = parse(date, DATE_FORMAT, new Date());
+  const shiftDay = (days: number) => setDate(format(addDays(selectedDay, days), DATE_FORMAT));
+  const showPreviousDay = () => shiftDay(-1);
+  const showNextDay = () => shiftDay(1);
+  const pickDay = (next: string) => next && setDate(next);
+  const dayHeading = format(selectedDay, 'EEEE, MMMM d, yyyy');
+
+  const isLoading = schedule.status === 'loading';
+  const isError = schedule.status === 'error';
+  const isLoaded = schedule.status === 'loaded';
+  const formattedEarnings = isLoaded ? formatCents(dayEarningsCents(schedule.groups)) : '…';
+  const hasNoBookings = isLoaded && schedule.groups.length === 0;
 
   return (
     <Container component="main" maxWidth="sm" className="py-xl">
@@ -59,13 +64,12 @@ export function WebAdminPage() {
             Bookings
           </Typography>
           <Typography color="text.secondary" className="mt-xs">
-            {format(parse(date, DATE_FORMAT, new Date()), 'EEEE, MMMM d, yyyy')}
+            {dayHeading}
           </Typography>
         </div>
-        {/* The day's earnings, lined up with the title. Cancelled bookings aren't counted. */}
         <div className="text-right" aria-live="polite">
           <Typography variant="h4" component="p" data-testid="day-earnings">
-            {schedule.status === 'loaded' ? formatCents(dayEarningsCents(schedule.groups)) : '…'}
+            {formattedEarnings}
           </Typography>
           <Typography color="text.secondary" className="mt-xs">
             Total earnings
@@ -74,25 +78,25 @@ export function WebAdminPage() {
       </div>
 
       <div className="mt-lg flex items-center gap-sm">
-        <IconButton aria-label="Previous day" onClick={() => shiftDay(-1)}>
+        <IconButton aria-label="Previous day" onClick={showPreviousDay}>
           <ChevronLeftIcon />
         </IconButton>
         <div className="flex-1">
-          <WebDatePicker label="Day" value={date} onChange={(next) => next && setDate(next)} />
+          <WebDatePicker label="Day" value={date} onChange={pickDay} />
         </div>
-        <IconButton aria-label="Next day" onClick={() => shiftDay(1)}>
+        <IconButton aria-label="Next day" onClick={showNextDay}>
           <ChevronRightIcon />
         </IconButton>
       </div>
 
-      <section aria-label="Schedule" aria-busy={schedule.status === 'loading'} className="mt-lg">
-        {schedule.status === 'loading' && (
+      <section aria-label="Schedule" aria-busy={isLoading} className="mt-lg">
+        {isLoading && (
           <div className="flex justify-center py-xl">
             <CircularProgress aria-label="Loading bookings" />
           </div>
         )}
 
-        {schedule.status === 'error' && (
+        {isError && (
           <Alert
             severity="error"
             action={
@@ -105,13 +109,13 @@ export function WebAdminPage() {
           </Alert>
         )}
 
-        {schedule.status === 'loaded' && schedule.groups.length === 0 && (
+        {hasNoBookings && (
           <Typography color="text.secondary" className="py-xl text-center">
             No bookings on this day.
           </Typography>
         )}
 
-        {schedule.status === 'loaded' && (
+        {isLoaded && (
           <div className="flex flex-col gap-md">
             {schedule.groups.map((group) => (
               <StartTimeCard key={group.startTime} group={group} />
@@ -123,7 +127,6 @@ export function WebAdminPage() {
   );
 }
 
-/** One card per start time: "3 appointments starting at 7:00 AM", then each appointment. */
 function StartTimeCard({ group }: { group: StartTimeGroup }) {
   const count = group.items.length;
   const title = `${count} ${count === 1 ? 'appointment' : 'appointments'} starting at ${displayTime(group.startTime)}`;
@@ -147,51 +150,54 @@ function StartTimeCard({ group }: { group: StartTimeGroup }) {
   );
 }
 
-/**
- * One appointment (one submission): the customer, the time, and every pet in it with its charge,
- * then the base charge once and the total.
- */
 function AppointmentItem({ item: { booking, customer, pets } }: { item: BookingListItem }) {
   const customerName = `${customer.firstName} ${customer.lastName}`;
   const { price } = booking;
+  const totalPrice = formatCents(price.totalCents);
+  const petsListLabel = `${customerName}'s pets`;
+  const baseCharge = formatCents(price.baseChargeCents);
+
+  const petsText = pets.length === 1 ? '1 pet' : `${pets.length} pets`;
+  const isCancelled = booking.status === 'cancelled';
+  const timeRange = `${displayTime(booking.startTime)} – ${displayTime(booking.endTime)}`;
+  const timeSummary = `${timeRange} · ${formatHours(booking.hoursRequested)} · ${petsText}`;
 
   return (
     <li aria-label={customerName} className="flex flex-col gap-xs">
       <div className="flex items-start justify-between gap-md">
         <div>
           <Typography className="font-medium">{customerName}</Typography>
-          <div className="text-body-small text-on-surface-variant">
-            {displayTime(booking.startTime)} – {displayTime(booking.endTime)} ·{' '}
-            {formatHours(booking.hoursRequested)} ·{' '}
-            {pets.length === 1 ? '1 pet' : `${pets.length} pets`}
-          </div>
+          <div className="text-body-small text-on-surface-variant">{timeSummary}</div>
         </div>
         <div className="flex flex-col items-end gap-xs">
-          <Typography className="font-medium">{formatCents(price.totalCents)}</Typography>
-          {booking.status === 'cancelled' && (
-            <Chip label="Cancelled" size="small" variant="outlined" />
-          )}
+          <Typography className="font-medium">{totalPrice}</Typography>
+          {isCancelled && <Chip label="Cancelled" size="small" variant="outlined" />}
         </div>
       </div>
 
-      <ul aria-label={`${customerName}'s pets`} className="m-0 flex list-none flex-col p-0 pl-md">
+      <ul aria-label={petsListLabel} className="m-0 flex list-none flex-col p-0 pl-md">
         {pets.map((pet, index) => (
-          <li key={pet.id} className="flex justify-between gap-md text-body-small">
-            <span>
-              {pet.name}
-              <span className="text-on-surface-variant">
-                {' '}
-                ({ANIMAL_TYPE_LABELS[pet.animalType]})
-              </span>
-            </span>
-            <span>{formatCents(price.pets[index]?.subtotalCents ?? 0)}</span>
-          </li>
+          <PetChargeRow key={pet.id} pet={pet} subtotalCents={price.pets[index]?.subtotalCents} />
         ))}
         <li className="flex justify-between gap-md text-body-small text-on-surface-variant">
           <span>Base charge</span>
-          <span>{formatCents(price.baseChargeCents)}</span>
+          <span>{baseCharge}</span>
         </li>
       </ul>
+    </li>
+  );
+}
+
+function PetChargeRow({ pet, subtotalCents = 0 }: { pet: Pet; subtotalCents?: number }) {
+  const animalLabel = `(${ANIMAL_TYPE_LABELS[pet.animalType]})`;
+  const subtotal = formatCents(subtotalCents);
+
+  return (
+    <li className="flex justify-between gap-md text-body-small">
+      <span>
+        {pet.name} <span className="text-on-surface-variant">{animalLabel}</span>
+      </span>
+      <span>{subtotal}</span>
     </li>
   );
 }

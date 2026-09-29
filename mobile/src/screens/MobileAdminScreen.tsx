@@ -5,7 +5,7 @@ import {
 } from '@pet-sitting/shared/booking-schedule';
 import { DATE_FORMAT, displayTime, formatHours } from '@pet-sitting/shared/date-time';
 import { designTokens } from '@pet-sitting/shared/design-tokens';
-import { ANIMAL_TYPE_LABELS } from '@pet-sitting/shared/domain';
+import { ANIMAL_TYPE_LABELS, type Pet } from '@pet-sitting/shared/domain';
 import type { BookingListItem } from '@pet-sitting/shared/mock-api';
 import { formatCents } from '@pet-sitting/shared/pricing';
 import { addDays } from 'date-fns/addDays';
@@ -27,17 +27,25 @@ import { MobileDatePicker } from '../components/MobileDatePicker';
 const { color, spacing } = designTokens;
 
 interface MobileAdminScreenProps {
-  /** 'YYYY-MM-DD'. Kept by the app, so the booking screen can open a given day here. */
   date: string;
   onDateChange: (date: string) => void;
 }
 
-/** Admin, matching the web page: one day's bookings grouped by start time, and its earnings. */
 export function MobileAdminScreen({ date, onDateChange }: MobileAdminScreenProps) {
   const { schedule, reload } = useDaySchedule(date);
 
-  const shiftDay = (days: number) =>
-    onDateChange(format(addDays(parse(date, DATE_FORMAT, new Date()), days), DATE_FORMAT));
+  const selectedDay = parse(date, DATE_FORMAT, new Date());
+  const shiftDay = (days: number) => onDateChange(format(addDays(selectedDay, days), DATE_FORMAT));
+  const showPreviousDay = () => shiftDay(-1);
+  const showNextDay = () => shiftDay(1);
+  const pickDay = (next: string) => next && onDateChange(next);
+  const dayHeading = format(selectedDay, 'EEEE, MMMM d, yyyy');
+
+  const isLoading = schedule.status === 'loading';
+  const isError = schedule.status === 'error';
+  const isLoaded = schedule.status === 'loaded';
+  const formattedEarnings = isLoaded ? formatCents(dayEarningsCents(schedule.groups)) : '…';
+  const hasNoBookings = isLoaded && schedule.groups.length === 0;
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -47,13 +55,12 @@ export function MobileAdminScreen({ date, onDateChange }: MobileAdminScreenProps
             Bookings
           </Text>
           <Text variant="bodyMedium" style={styles.muted}>
-            {format(parse(date, DATE_FORMAT, new Date()), 'EEEE, MMMM d, yyyy')}
+            {dayHeading}
           </Text>
         </View>
-        {/* The day's earnings, lined up with the title. Cancelled bookings aren't counted. */}
         <View style={styles.earnings} accessibilityLiveRegion="polite">
           <Text variant="headlineMedium" testID="day-earnings">
-            {schedule.status === 'loaded' ? formatCents(dayEarningsCents(schedule.groups)) : '…'}
+            {formattedEarnings}
           </Text>
           <Text variant="bodyMedium" style={styles.muted}>
             Total earnings
@@ -65,44 +72,35 @@ export function MobileAdminScreen({ date, onDateChange }: MobileAdminScreenProps
         <IconButton
           icon="chevron-left"
           accessibilityLabel="Previous day"
-          onPress={() => shiftDay(-1)}
+          onPress={showPreviousDay}
         />
         <View style={styles.dayField}>
-          <MobileDatePicker
-            label="Day"
-            value={date}
-            onChange={(next) => next && onDateChange(next)}
-          />
+          <MobileDatePicker label="Day" value={date} onChange={pickDay} />
         </View>
-        <IconButton
-          icon="chevron-right"
-          accessibilityLabel="Next day"
-          onPress={() => shiftDay(1)}
-        />
+        <IconButton icon="chevron-right" accessibilityLabel="Next day" onPress={showNextDay} />
       </View>
 
-      {schedule.status === 'loading' && (
+      {isLoading && (
         <ActivityIndicator accessibilityLabel="Loading bookings" style={styles.message} />
       )}
 
-      {schedule.status === 'error' && (
+      {isError && (
         <View style={styles.message}>
           <Text style={styles.errorText}>{schedule.message}</Text>
           <Button onPress={reload}>Try again</Button>
         </View>
       )}
 
-      {schedule.status === 'loaded' && schedule.groups.length === 0 && (
+      {hasNoBookings && (
         <Text style={[styles.muted, styles.message]}>No bookings on this day.</Text>
       )}
 
-      {schedule.status === 'loaded' &&
+      {isLoaded &&
         schedule.groups.map((group) => <StartTimeCard key={group.startTime} group={group} />)}
     </ScrollView>
   );
 }
 
-/** One card per start time: "3 appointments starting at 7:00 AM", then each appointment. */
 function StartTimeCard({ group }: { group: StartTimeGroup }) {
   const count = group.items.length;
   const title = `${count} ${count === 1 ? 'appointment' : 'appointments'} starting at ${displayTime(group.startTime)}`;
@@ -124,29 +122,33 @@ function StartTimeCard({ group }: { group: StartTimeGroup }) {
   );
 }
 
-/** One appointment (one submission): the customer, the time, every pet with its charge, the total. */
 function AppointmentItem({ item: { booking, customer, pets } }: { item: BookingListItem }) {
   const customerName = `${customer.firstName} ${customer.lastName}`;
   const { price } = booking;
+  const appointmentLabel = `Appointment for ${customerName}`;
+  const petsText = pets.length === 1 ? '1 pet' : `${pets.length} pets`;
+  const timeRange = `${displayTime(booking.startTime)} – ${displayTime(booking.endTime)}`;
+  const timeSummary = `${timeRange} · ${formatHours(booking.hoursRequested)} · ${petsText}`;
+  const totalPrice = formatCents(price.totalCents);
+  const baseCharge = formatCents(price.baseChargeCents);
+  const isCancelled = booking.status === 'cancelled';
 
   return (
-    <View style={styles.appointment} accessibilityLabel={`Appointment for ${customerName}`}>
+    <View style={styles.appointment} accessibilityLabel={appointmentLabel}>
       <View style={styles.row}>
         <View style={styles.grow}>
           <Text variant="bodyLarge" style={styles.bold}>
             {customerName}
           </Text>
           <Text variant="bodySmall" style={styles.muted}>
-            {displayTime(booking.startTime)} – {displayTime(booking.endTime)} ·{' '}
-            {formatHours(booking.hoursRequested)} ·{' '}
-            {pets.length === 1 ? '1 pet' : `${pets.length} pets`}
+            {timeSummary}
           </Text>
         </View>
         <View style={styles.amount}>
           <Text variant="bodyLarge" style={styles.bold}>
-            {formatCents(price.totalCents)}
+            {totalPrice}
           </Text>
-          {booking.status === 'cancelled' && (
+          {isCancelled && (
             <Chip compact mode="outlined">
               Cancelled
             </Chip>
@@ -156,23 +158,32 @@ function AppointmentItem({ item: { booking, customer, pets } }: { item: BookingL
 
       <View style={styles.lines}>
         {pets.map((pet, index) => (
-          <View key={pet.id} style={styles.row}>
-            <Text variant="bodySmall">
-              {pet.name}
-              <Text style={styles.muted}> ({ANIMAL_TYPE_LABELS[pet.animalType]})</Text>
-            </Text>
-            <Text variant="bodySmall">{formatCents(price.pets[index]?.subtotalCents ?? 0)}</Text>
-          </View>
+          <PetChargeRow key={pet.id} pet={pet} subtotalCents={price.pets[index]?.subtotalCents} />
         ))}
         <View style={styles.row}>
           <Text variant="bodySmall" style={styles.muted}>
             Base charge
           </Text>
           <Text variant="bodySmall" style={styles.muted}>
-            {formatCents(price.baseChargeCents)}
+            {baseCharge}
           </Text>
         </View>
       </View>
+    </View>
+  );
+}
+
+function PetChargeRow({ pet, subtotalCents = 0 }: { pet: Pet; subtotalCents?: number }) {
+  const animalLabel = ` (${ANIMAL_TYPE_LABELS[pet.animalType]})`;
+  const subtotal = formatCents(subtotalCents);
+
+  return (
+    <View style={styles.row}>
+      <Text variant="bodySmall">
+        {pet.name}
+        <Text style={styles.muted}>{animalLabel}</Text>
+      </Text>
+      <Text variant="bodySmall">{subtotal}</Text>
     </View>
   );
 }

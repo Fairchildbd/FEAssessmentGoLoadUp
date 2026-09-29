@@ -1,18 +1,21 @@
 import js from '@eslint/js';
 import prettier from 'eslint-config-prettier';
 import reactHooks from 'eslint-plugin-react-hooks';
+import globals from 'globals';
 import { defineConfig, globalIgnores } from 'eslint/config';
 import tseslint from 'typescript-eslint';
 
-const platformOnly =
+const sharedMustStayPlatformAgnostic =
   'shared/ runs on web and mobile. Put platform-specific code in web/ or mobile/.';
 
-// Metro doesn't tree-shake: a single `import { format } from 'date-fns'` added about 200 KB to the
-// iOS bundle. Importing each function from its own path keeps only what's used.
-const dateFnsRoot = {
+const dateFnsRootImport = {
   name: 'date-fns',
   message: "Import each function from its own path, e.g. 'date-fns/format'.",
 };
+
+const anyStyleProp = 'JSXAttribute[name.name=/[sS]tyle$/] > JSXExpressionContainer';
+const inlineStyleObject = `${anyStyleProp} > ObjectExpression`;
+const inlineStyleObjectInArray = `${anyStyleProp} > ArrayExpression > ObjectExpression`;
 
 export default defineConfig(
   globalIgnores([
@@ -27,17 +30,15 @@ export default defineConfig(
   tseslint.configs.recommended,
   reactHooks.configs.flat.recommended,
   {
-    rules: { 'no-restricted-imports': ['error', { paths: [dateFnsRoot] }] },
+    rules: { 'no-restricted-imports': ['error', { paths: [dateFnsRootImport] }] },
   },
   {
-    // Keeps shared/ platform-agnostic: no web or mobile libraries, no browser-only globals.
     files: ['shared/**/*.{ts,tsx}'],
     rules: {
-      // Rule options replace, not merge, so this repeats the date-fns rule from above.
       'no-restricted-imports': [
         'error',
         {
-          paths: [dateFnsRoot],
+          paths: [dateFnsRootImport],
           patterns: [
             {
               group: [
@@ -48,7 +49,7 @@ export default defineConfig(
                 '@mui/*',
                 'expo*',
               ],
-              message: platformOnly,
+              message: sharedMustStayPlatformAgnostic,
             },
           ],
         },
@@ -57,28 +58,26 @@ export default defineConfig(
         'error',
         ...['window', 'document', 'localStorage', 'sessionStorage', 'navigator'].map((name) => ({
           name,
-          message: platformOnly,
+          message: sharedMustStayPlatformAgnostic,
         })),
       ],
     },
   },
   {
-    // Mobile styles live in StyleSheet.create, not inline objects: they're named, created once
-    // instead of on every render, and kept together at the bottom of each file. Matches any
-    // style-like prop (style, contentStyle, contentContainerStyle, ...) given an object literal,
-    // directly or inside an array.
     files: ['mobile/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-syntax': [
         'error',
         {
-          selector:
-            'JSXAttribute[name.name=/[sS]tyle$/] > JSXExpressionContainer > ObjectExpression, JSXAttribute[name.name=/[sS]tyle$/] > JSXExpressionContainer > ArrayExpression > ObjectExpression',
+          selector: [inlineStyleObject, inlineStyleObjectInArray].join(', '),
           message: 'Move this style into a StyleSheet.create at the bottom of the file.',
         },
       ],
     },
   },
-  // Last, so formatting is left to Prettier.
+  {
+    files: ['mobile/jest.config.js'],
+    languageOptions: { globals: globals.node },
+  },
   prettier,
 );

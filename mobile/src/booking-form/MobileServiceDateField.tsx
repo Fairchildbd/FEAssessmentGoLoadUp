@@ -6,7 +6,6 @@ interface MobileServiceDateFieldProps {
   control: Control<BookingFormValues, unknown, BookingRequest>;
 }
 
-/** The booking form's service date: the shared date picker, bound to React Hook Form. */
 export function MobileServiceDateField({ control }: MobileServiceDateFieldProps) {
   return (
     <Controller
@@ -18,7 +17,7 @@ export function MobileServiceDateField({ control }: MobileServiceDateFieldProps)
           disablePast
           value={field.value}
           onChange={field.onChange}
-          onClose={field.onBlur} // closing the calendar counts as leaving the field
+          onClose={field.onBlur}
           error={fieldState.error?.message}
         />
       )}

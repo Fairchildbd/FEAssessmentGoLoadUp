@@ -23,12 +23,6 @@ interface MobileServiceTimeFieldProps {
   control: Control<BookingFormValues, unknown, BookingRequest>;
 }
 
-/**
- * The start and end time in one input, like the web field. Tapping it opens a full-screen picker,
- * the same as the calendar's, with a Start column and an End column; the End column only lists
- * times 2 to 8 hours after the start, so a length outside the limits can't be picked. The lists
- * come from shared/. Picks are a draft until Save.
- */
 export function MobileServiceTimeField({ control }: MobileServiceTimeFieldProps) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<ServiceTime>({ startTime: '', endTime: '' });
@@ -41,54 +35,57 @@ export function MobileServiceTimeField({ control }: MobileServiceTimeFieldProps)
       render={({ field, fieldState }) => {
         const { startTime, endTime } = field.value;
         const hasRange = startTime !== '' && endTime !== '';
-        const shown = hasRange ? `${displayTime(startTime)} – ${displayTime(endTime)}` : '';
+        const fieldText = hasRange ? `${displayTime(startTime)} – ${displayTime(endTime)}` : '';
+        const fieldLabel = hasRange ? `Time, ${fieldText}` : 'Time';
+        const errorMessage = fieldState.error?.message;
+        const rangeLength = hasRange ? formatHours(hoursBetween(startTime, endTime)) : '';
+        const helperType = errorMessage ? 'error' : 'info';
+        const showHelper = Boolean(errorMessage) || hasRange;
+        const canSave = draft.startTime !== '' && draft.endTime !== '';
 
+        const openPicker = () => {
+          setDraft(field.value);
+          setOpen(true);
+        };
         const close = () => {
           setOpen(false);
-          field.onBlur(); // counts as leaving the field, so its error can show
+          field.onBlur();
+        };
+        const saveDraft = () => {
+          field.onChange(draft);
+          close();
         };
 
         return (
           <View>
             <Pressable
-              onPress={() => {
-                setDraft(field.value); // start from the saved times each time
-                setOpen(true);
-              }}
+              onPress={openPicker}
               accessibilityRole="button"
-              accessibilityLabel={`Time${shown ? `, ${shown}` : ''}`}
+              accessibilityLabel={fieldLabel}
               accessibilityHint="Opens a list of start and end times"
             >
-              {/* pointerEvents="none" lets the whole field act as one button and stops the keyboard. */}
               <View pointerEvents="none">
                 <TextInput
                   mode="outlined"
                   label="Time"
-                  value={shown}
+                  value={fieldText}
                   placeholder="Start – end"
                   editable={false}
-                  error={Boolean(fieldState.error)}
+                  error={Boolean(errorMessage)}
                   right={<TextInput.Icon icon="clock-outline" />}
                 />
               </View>
             </Pressable>
-            <HelperText
-              type={fieldState.error ? 'error' : 'info'}
-              visible={Boolean(fieldState.error) || hasRange}
-            >
-              {fieldState.error?.message ??
-                (hasRange ? formatHours(hoursBetween(startTime, endTime)) : '')}
+            <HelperText type={helperType} visible={showHelper}>
+              {errorMessage ?? rangeLength}
             </HelperText>
 
             <MobileFullScreenModal
               visible={open}
               accessibilityLabel="Choose a start and end time"
               onDismiss={close}
-              onSave={() => {
-                field.onChange(draft);
-                close();
-              }}
-              saveDisabled={draft.startTime === '' || draft.endTime === ''}
+              onSave={saveDraft}
+              saveDisabled={!canSave}
             >
               <TimeColumns draft={draft} onChange={setDraft} serviceDate={serviceDate} />
             </MobileFullScreenModal>
@@ -105,55 +102,62 @@ interface TimeColumnsProps {
   serviceDate: string;
 }
 
-/** The Start and End columns, side by side and scrolling separately. */
 function TimeColumns({ draft, onChange, serviceDate }: TimeColumnsProps) {
   const { startTime, endTime } = draft;
+  const hasStart = startTime !== '';
+  const pickStart = (time: string) =>
+    onChange({ startTime: time, endTime: endTimeForNewStart(draft, time) });
+  const pickEnd = (time: string) => onChange({ startTime, endTime: time });
+  const startOptions = START_TIMES.map((time) => ({
+    time,
+    label: displayTime(time),
+    selected: time === startTime,
+    passed: hasStartPassed(serviceDate, time),
+  }));
+  const endOptions = endTimeOptions(startTime).map((time) => ({
+    time,
+    label: displayTime(time),
+    length: formatHours(hoursBetween(startTime, time)),
+    selected: time === endTime,
+  }));
 
   return (
     <View style={styles.picker}>
       <View style={styles.columns}>
         <ScrollView style={styles.column} accessibilityLabel="Start time">
           <List.Subheader>Start</List.Subheader>
-          {START_TIMES.map((time) => {
-            const passed = hasStartPassed(serviceDate, time); // on today's date
-            return (
-              <List.Item
-                key={time}
-                title={displayTime(time)}
-                accessibilityLabel={`Start ${displayTime(time)}`}
-                accessibilityState={{ selected: time === startTime, disabled: passed }}
-                disabled={passed}
-                onPress={() =>
-                  onChange({ startTime: time, endTime: endTimeForNewStart(draft, time) })
-                }
-                style={time === startTime ? styles.selected : undefined}
-                titleStyle={passed ? styles.disabled : undefined}
-              />
-            );
-          })}
+          {startOptions.map((option) => (
+            <List.Item
+              key={option.time}
+              title={option.label}
+              accessibilityLabel={`Start ${option.label}`}
+              accessibilityState={{ selected: option.selected, disabled: option.passed }}
+              disabled={option.passed}
+              onPress={() => pickStart(option.time)}
+              style={option.selected ? styles.selected : undefined}
+              titleStyle={option.passed ? styles.disabled : undefined}
+            />
+          ))}
         </ScrollView>
 
         <ScrollView style={[styles.column, styles.endColumn]} accessibilityLabel="End time">
           <List.Subheader>End</List.Subheader>
-          {startTime === '' ? (
+          {hasStart ? (
+            endOptions.map((option) => (
+              <List.Item
+                key={option.time}
+                title={option.label}
+                description={option.length}
+                accessibilityLabel={`End ${option.label}, ${option.length}`}
+                accessibilityState={{ selected: option.selected }}
+                onPress={() => pickEnd(option.time)}
+                style={option.selected ? styles.selected : undefined}
+              />
+            ))
+          ) : (
             <Text variant="bodyMedium" style={[styles.muted, styles.hint]}>
               Choose a start time first
             </Text>
-          ) : (
-            endTimeOptions(startTime).map((time) => {
-              const hours = formatHours(hoursBetween(startTime, time));
-              return (
-                <List.Item
-                  key={time}
-                  title={displayTime(time)}
-                  description={hours}
-                  accessibilityLabel={`End ${displayTime(time)}, ${hours}`}
-                  accessibilityState={{ selected: time === endTime }}
-                  onPress={() => onChange({ startTime, endTime: time })}
-                  style={time === endTime ? styles.selected : undefined}
-                />
-              );
-            })
           )}
         </ScrollView>
       </View>

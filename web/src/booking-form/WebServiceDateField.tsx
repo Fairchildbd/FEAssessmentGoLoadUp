@@ -6,7 +6,6 @@ interface WebServiceDateFieldProps {
   control: Control<BookingFormValues, unknown, BookingRequest>;
 }
 
-/** The booking form's service date: the shared date picker, bound to React Hook Form. */
 export function WebServiceDateField({ control }: WebServiceDateFieldProps) {
   return (
     <Controller
@@ -18,7 +17,7 @@ export function WebServiceDateField({ control }: WebServiceDateFieldProps) {
           disablePast
           value={field.value}
           onChange={field.onChange}
-          onClose={field.onBlur} // closing the calendar counts as leaving the field
+          onClose={field.onBlur}
           name={field.name}
           inputRef={field.ref}
           error={fieldState.error?.message}

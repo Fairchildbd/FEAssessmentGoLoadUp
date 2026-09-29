@@ -3,7 +3,6 @@ import type { BookingListItem } from '../mock-api/mockApi';
 import { mockDatabase } from '../mock-database/mockDatabase';
 import { dayEarningsCents, groupByStartTime } from './bookingSchedule';
 
-/** The seed's bookings for a date, joined with their customer and pet, in seed order. */
 function seedItems(serviceDate: string): BookingListItem[] {
   return mockDatabase.bookings
     .filter((booking) => booking.serviceDate === serviceDate)
@@ -22,7 +21,6 @@ const summary = (items: BookingListItem[]) =>
 
 describe('groupByStartTime', () => {
   it('puts bookings that start at the same time together, earliest time first', () => {
-    // Seed on 2026-10-03: Biscuit and Maple at 09:00, then Biscuit again at 11:00.
     expect(summary(seedItems('2026-10-03'))).toEqual([
       ['09:00', ['Biscuit', 'Maple']],
       ['11:00', ['Biscuit']],
@@ -32,7 +30,7 @@ describe('groupByStartTime', () => {
   it('sorts by start time whatever order the bookings come in', () => {
     expect(summary(seedItems('2026-10-10').reverse())).toEqual([
       ['08:00', ['Truffle']],
-      ['10:00', ['Hamlet']], // cancelled, but still listed
+      ['10:00', ['Hamlet']],
       ['12:00', ['Hamlet']],
     ]);
   });
@@ -55,12 +53,10 @@ describe('groupByStartTime', () => {
 
 describe('dayEarningsCents', () => {
   it("adds up the day's confirmed bookings", () => {
-    // Seed on 2026-10-03: three bookings at $40 each.
     expect(dayEarningsCents(groupByStartTime(seedItems('2026-10-03')))).toBe(12000);
   });
 
   it('leaves out cancelled bookings', () => {
-    // Seed on 2026-10-10: Truffle $120 and Hamlet $60 confirmed; Hamlet's $140 was cancelled.
     expect(dayEarningsCents(groupByStartTime(seedItems('2026-10-10')))).toBe(18000);
   });
 

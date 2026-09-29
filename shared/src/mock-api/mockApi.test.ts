@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { BookingRequest } from '../booking-form/bookingFormSchema';
 import { createBooking, listBookings, MockApiError, resetMockApi } from './mockApi';
 
-// "Now" is 1 Oct 2026 at 12:00, before the seed's October bookings.
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date(2026, 9, 1, 12, 0));
@@ -62,7 +61,6 @@ describe('createBooking', () => {
   });
 
   it("refuses a time that overlaps one of the pet's confirmed bookings", async () => {
-    // Biscuit is booked 09:00-11:00 and 11:00-13:00 on 2026-10-03.
     const biscuit: BookingRequest = { ...request, pets: [{ name: 'Biscuit', animalType: 'dog' }] };
 
     await expect(
@@ -73,7 +71,6 @@ describe('createBooking', () => {
     ).rejects.toThrow(
       new MockApiError('Biscuit already has a booking from 9:00 AM to 11:00 AM that day'),
     );
-    // Back to back is fine: 13:00 is when his last booking ends.
     await expect(
       createBooking(
         { ...biscuit, serviceTime: { startTime: '13:00', endTime: '15:00' } },
@@ -83,7 +80,6 @@ describe('createBooking', () => {
   });
 
   it('ignores cancelled bookings when checking for overlaps', async () => {
-    // Hamlet's 10:00-16:00 booking on 2026-10-10 was cancelled; his 12:00-14:00 one stands.
     const hamlet: BookingRequest = {
       firstName: 'Sam',
       lastName: 'Okafor',

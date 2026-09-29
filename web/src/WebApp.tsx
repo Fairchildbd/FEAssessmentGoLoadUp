@@ -8,18 +8,11 @@ import { WebAdminPage } from './pages/WebAdminPage';
 import { WebBookingPage } from './pages/WebBookingPage';
 import { webTheme } from './theme/webTheme';
 
-/**
- * Root of the web app: platform providers, the nav bar and the two pages.
- *
- * `enableCssLayer` puts MUI's styles in a CSS cascade layer named "mui". Tailwind's classes are
- * not layered, so they always win over MUI's defaults (see web/src/theme/tailwind.css).
- */
 export function WebApp() {
   return (
     <StyledEngineProvider enableCssLayer>
       <ThemeProvider theme={webTheme}>
         <CssBaseline />
-        {/* Date pickers work in date-fns Dates, like the rest of the repo. */}
         <LocalizationProvider dateAdapter={AdapterDateFns}>
           <BrowserRouter>
             <WebNavBar />

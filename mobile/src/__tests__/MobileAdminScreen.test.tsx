@@ -8,16 +8,11 @@ import {
   submitButton,
 } from '../test-utils/mobileTestHelpers';
 
-// The same behaviors as web/e2e/webAdminPage.spec.ts, on the phone. The seed has bookings on
-// 3, 5 and 10 October 2026, and "now" is noon on 1 October.
-
 beforeEach(renderApp);
 
-// Paper gives tab bar items the "button" role on iOS (the test platform) and "tab" on Android.
 const tab = (name: string) => screen.getByRole('button', { name });
 const openAdminTab = () => fireEvent.press(tab('Admin'));
 
-/** The start-time cards' titles, top to bottom. */
 const cardTitles = () =>
   screen
     .getAllByRole('header')
@@ -42,7 +37,6 @@ test('groups a day’s bookings by start time, earliest first, with the day’s 
   ]);
   expect(earnings()).toHaveTextContent('$120');
 
-  // Jordan booked each dog separately, so they're two appointments.
   const nineOClock = screen.getByLabelText('2 appointments starting at 9:00 AM');
   const appointments = within(nineOClock).getAllByLabelText('Appointment for Jordan Rivera');
   expect(appointments).toHaveLength(2);
@@ -53,7 +47,7 @@ test('groups a day’s bookings by start time, earliest first, with the day’s 
 
 test('switches days with the date picker and the previous and next buttons', async () => {
   await openAdminTab();
-  expect(screen.getByText('Thursday, October 1, 2026')).toBeOnTheScreen(); // today
+  expect(screen.getByText('Thursday, October 1, 2026')).toBeOnTheScreen();
   expect(await screen.findByText('No bookings on this day.')).toBeOnTheScreen();
   expect(earnings()).toHaveTextContent('$0');
 
@@ -76,8 +70,8 @@ test('switches days with the date picker and the previous and next buttons', asy
     '1 appointment starting at 10:00 AM',
     '1 appointment starting at 12:00 PM',
   ]);
-  expect(screen.getByText('Cancelled')).toBeOnTheScreen(); // Hamlet's 10:00 booking
-  expect(earnings()).toHaveTextContent('$180'); // the cancelled $140 earns nothing
+  expect(screen.getByText('Cancelled')).toBeOnTheScreen();
+  expect(earnings()).toHaveTextContent('$180');
 });
 
 test('one submission is one appointment, with all its pets under the customer', async () => {
@@ -108,7 +102,6 @@ test('one submission is one appointment, with all its pets under the customer', 
   ]);
   const appointment = screen.getByLabelText('Appointment for Ben Fairchild');
   expect(appointment).toHaveTextContent(/8:30 AM – 4:30 PM · 8 hours · 4 pets/);
-  // 8 hours each, and the $20 base once: $80 + $80 + $40 + $160 + $20 = $380.
   for (const line of [
     /Oscar \(Dog\)\$80/,
     /Sulley \(Dog\)\$80/,
@@ -119,16 +112,14 @@ test('one submission is one appointment, with all its pets under the customer', 
     expect(appointment).toHaveTextContent(line);
   }
   expect(appointment).toHaveTextContent(/\$380/);
-  expect(earnings()).toHaveTextContent('$500'); // $120 from the seed + $380
+  expect(earnings()).toHaveTextContent('$500');
 
-  // The tabs switch back to the form, and the booking is still there on return.
   await fireEvent.press(tab('Book a sitter'));
   await openAdminTab();
   expect(await screen.findByText('1 appointment starting at 8:30 AM')).toBeOnTheScreen();
 });
 
 test("refuses a booking that overlaps one of the pet's bookings", async () => {
-  // Biscuit is booked from 9:00 to 11:00 and from 11:00 to 1:00 on 3 October.
   await fillName('Jordan', 'Rivera');
   await fillPet(0, 'Biscuit', 'Dog');
   await pickDate(3);
@@ -138,5 +129,5 @@ test("refuses a booking that overlaps one of the pet's bookings", async () => {
   expect(
     await screen.findByText('Biscuit already has a booking from 9:00 AM to 11:00 AM that day'),
   ).toBeOnTheScreen();
-  expect(screen.getByLabelText('Pet 1 name')).toHaveDisplayValue('Biscuit'); // kept
+  expect(screen.getByLabelText('Pet 1 name')).toHaveDisplayValue('Biscuit');
 });

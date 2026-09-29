@@ -3,13 +3,8 @@ import { MD3LightTheme, type MD3Theme } from 'react-native-paper';
 
 const { color, palette, radius } = designTokens;
 
-/**
- * Mobile-only styling: the shared design tokens mapped onto React Native Paper's Material Design 3
- * theme. Paper already uses MD3 color role names, so the tokens map one-to-one.
- */
 export const mobileTheme: MD3Theme = {
   ...MD3LightTheme,
-  // Paper scales roundness per component: text inputs use it as-is, cards 3x, buttons 5x.
   roundness: radius.control,
   colors: {
     ...MD3LightTheme.colors,
@@ -32,7 +27,6 @@ export const mobileTheme: MD3Theme = {
     onError: color.onError,
     errorContainer: color.errorContainer,
     onErrorContainer: color.onErrorContainer,
-    // Paper's defaults for these are tinted purple (the MD3 baseline palette), so neutralize them.
     surfaceVariant: color.background,
     inversePrimary: palette.teal300,
     elevation: {

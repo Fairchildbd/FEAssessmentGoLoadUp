@@ -1,6 +1,5 @@
 import type { Booking, Customer, Pet, PricingRules } from '../domain/bookingDomain';
 
-/** The shape of the mock backend's data store. */
 export interface MockDatabase {
   pricingRules: PricingRules;
   customers: Customer[];
@@ -8,19 +7,6 @@ export interface MockDatabase {
   bookings: Booking[];
 }
 
-/**
- * Mock database: a plain JSON object standing in for the backend (there is no server in this
- * repo). Treat it as seed data: the mock API layer should copy it into memory and read and write
- * the copy, so this object never changes.
- *
- * The seed has 2 of each animal and covers the same-day gotcha:
- * - Jordan Rivera has 2 dogs and 3 two-hour bookings on 2026-10-03: both dogs from 09:00, then
- *   Biscuit again from 11:00, the minute his first booking ends.
- * - Miso is booked 09:00-17:00 on 2026-10-05, so another booking for Miso that day has to fit
- *   before 09:00 or after 17:00.
- * - Hamlet's 10:00-16:00 booking on 2026-10-10 was cancelled, which freed the slot for his
- *   12:00-14:00 booking.
- */
 export const mockDatabase: MockDatabase = {
   pricingRules: {
     currency: 'USD',

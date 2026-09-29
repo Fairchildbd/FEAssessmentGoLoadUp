@@ -1,6 +1,4 @@
 {
-  // Tailwind CSS IntelliSense autocompletes the token classes (bg-primary, p-md, ...) and shows
-  // the CSS each class generates on hover.
   "recommendations": [
     "bradlc.vscode-tailwindcss",
     "dbaeumer.vscode-eslint",

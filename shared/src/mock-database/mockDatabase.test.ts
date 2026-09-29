@@ -9,13 +9,11 @@ import { DATE_FORMAT, matchesFormat, parseDateTime, TIME_FORMAT } from '../date-
 import { ANIMAL_TYPES, BOOKING_RULES, type Booking } from '../domain/bookingDomain';
 import { mockDatabase } from './mockDatabase';
 
-/** A booking's time slot as a date-fns interval. */
 const slotOf = (booking: Booking) => ({
   start: parseDateTime(booking.serviceDate, booking.startTime),
   end: parseDateTime(booking.serviceDate, booking.endTime),
 });
 
-// Guards the seed data, so the apps and E2E tests can rely on it staying valid.
 describe('mockDatabase seed', () => {
   const { customers, pets, bookings } = mockDatabase;
   const confirmedBookings = bookings.filter((booking) => booking.status === 'confirmed');
@@ -78,7 +76,6 @@ describe('mockDatabase seed', () => {
       );
       expect(isBefore(start, opening) || isAfter(end, closing), booking.id).toBe(false);
       expect(getMinutes(start) % timeStepMinutes, booking.id).toBe(0);
-      // Intl throws a RangeError for a time zone name it doesn't know.
       expect(() => new Intl.DateTimeFormat('en-US', { timeZone: booking.timeZone })).not.toThrow();
     }
   });

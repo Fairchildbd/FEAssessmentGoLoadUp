@@ -8,29 +8,17 @@ import { HelperText, TextInput } from 'react-native-paper';
 import { Calendar, en, registerTranslation } from 'react-native-paper-dates';
 import { MobileFullScreenModal } from './MobileFullScreenModal';
 
-// The calendar's month and weekday names. Registered once, when this module first loads.
 registerTranslation('en', en);
 
 export interface MobileDatePickerProps {
   label: string;
-  /** 'YYYY-MM-DD', or '' for no date. */
   value: string;
   onChange: (value: string) => void;
-  /** Called when the calendar closes, which counts as leaving the field. */
   onClose?: () => void;
   disablePast?: boolean;
   error?: string;
 }
 
-/**
- * The mobile counterpart of WebDatePicker: a field that can't be typed in, and tapping anywhere on
- * it (the text or the calendar icon) opens a full-screen calendar. It takes and returns 'YYYY-MM-DD'
- * strings.
- *
- * The calendar is react-native-paper-dates' Calendar in our own full-screen modal, rather than its
- * DatePickerModal, whose "Select date" header (with a pencil to type the date instead) can't be
- * turned off. The time picker uses the same modal.
- */
 export function MobileDatePicker({
   label,
   value,
@@ -41,32 +29,39 @@ export function MobileDatePicker({
 }: MobileDatePickerProps) {
   const [open, setOpen] = useState(false);
   const date = value ? parse(value, DATE_FORMAT, new Date()) : undefined;
-  // The day tapped in the calendar, kept until Save.
   const [draft, setDraft] = useState<Date | undefined>(date);
-  const shown = date ? format(date, 'MM/dd/yyyy') : '';
+  const fieldText = date ? format(date, 'MM/dd/yyyy') : '';
+  const fieldLabel = fieldText ? `${label}, ${fieldText}` : label;
+  const modalLabel = `Choose ${label.toLowerCase()}`;
+  const validRange = disablePast ? { startDate: startOfToday() } : undefined;
 
+  const openCalendar = () => {
+    setDraft(date);
+    setOpen(true);
+  };
   const close = () => {
     setOpen(false);
     onClose?.();
   };
+  const saveDraft = () => {
+    if (draft) onChange(format(draft, DATE_FORMAT));
+    close();
+  };
+  const pickDraft = ({ date: picked }: { date: Date | undefined }) => setDraft(picked);
 
   return (
     <View>
       <Pressable
-        onPress={() => {
-          setDraft(date); // start from the saved date each time
-          setOpen(true);
-        }}
+        onPress={openCalendar}
         accessibilityRole="button"
-        accessibilityLabel={`${label}${shown ? `, ${shown}` : ''}`}
+        accessibilityLabel={fieldLabel}
         accessibilityHint="Opens a calendar"
       >
-        {/* pointerEvents="none" lets the whole field act as one button and stops the keyboard. */}
         <View pointerEvents="none">
           <TextInput
             mode="outlined"
             label={label}
-            value={shown}
+            value={fieldText}
             placeholder="MM/DD/YYYY"
             editable={false}
             error={Boolean(error)}
@@ -78,20 +73,17 @@ export function MobileDatePicker({
 
       <MobileFullScreenModal
         visible={open}
-        accessibilityLabel={`Choose ${label.toLowerCase()}`}
+        accessibilityLabel={modalLabel}
         onDismiss={close}
-        onSave={() => {
-          if (draft) onChange(format(draft, DATE_FORMAT));
-          close();
-        }}
+        onSave={saveDraft}
         saveDisabled={!draft}
       >
         <Calendar
           locale="en"
           mode="single"
           date={draft}
-          onChange={({ date: picked }) => setDraft(picked)}
-          validRange={disablePast ? { startDate: startOfToday() } : undefined}
+          onChange={pickDraft}
+          validRange={validRange}
         />
       </MobileFullScreenModal>
     </View>

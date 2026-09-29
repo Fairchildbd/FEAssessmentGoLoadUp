@@ -22,11 +22,6 @@ interface WebServiceTimeFieldProps {
   control: Control<BookingFormValues, unknown, BookingRequest>;
 }
 
-/**
- * The start and end time in one input. Clicking it opens a panel with a Start column and an End
- * column; the number of hours comes from the two, so there's no separate hours input. The End
- * column only lists times 2 to 8 hours after the start.
- */
 export function WebServiceTimeField({ control }: WebServiceTimeFieldProps) {
   const anchorRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
@@ -38,16 +33,37 @@ export function WebServiceTimeField({ control }: WebServiceTimeFieldProps) {
       control={control}
       render={({ field, fieldState }) => {
         const { startTime, endTime } = field.value;
-        const hours = hoursBetween(startTime, endTime);
-        const hasRange = startTime !== '' && endTime !== '';
+        const hasStart = startTime !== '';
+        const hasRange = hasStart && endTime !== '';
+        const errorMessage = fieldState.error?.message;
+        const rangeLength = hasRange ? formatHours(hoursBetween(startTime, endTime)) : undefined;
+        const fieldText = hasRange
+          ? `${displayTime(startTime)} – ${displayTime(endTime)}`
+          : hasStart
+            ? `${displayTime(startTime)} – `
+            : '';
+        const shrinkLabel = open || hasStart || undefined;
+        const startOptions = START_TIMES.map((time) => ({
+          time,
+          label: displayTime(time),
+          selected: time === startTime,
+          disabled: hasStartPassed(serviceDate, time),
+        }));
+        const endOptions = endTimeOptions(startTime).map((time) => ({
+          time,
+          label: displayTime(time),
+          length: formatHours(hoursBetween(startTime, time)),
+          selected: time === endTime,
+        }));
+
+        const openPicker = () => setOpen(true);
 
         const close = () => {
           setOpen(false);
-          field.onBlur(); // counts as leaving the field, so its error can show
+          field.onBlur();
         };
 
         const pickStart = (newStart: string) => {
-          // Keep the same number of hours if they still fit before closing; otherwise pick again.
           field.onChange({
             startTime: newStart,
             endTime: endTimeForNewStart(field.value, newStart),
@@ -62,7 +78,7 @@ export function WebServiceTimeField({ control }: WebServiceTimeFieldProps) {
         const openOnKey = (event: KeyboardEvent) => {
           if (['Enter', ' ', 'ArrowDown'].includes(event.key)) {
             event.preventDefault();
-            setOpen(true);
+            openPicker();
           }
         };
 
@@ -75,19 +91,13 @@ export function WebServiceTimeField({ control }: WebServiceTimeFieldProps) {
               label="Time"
               placeholder="Start – end"
               fullWidth
-              value={
-                hasRange
-                  ? `${displayTime(startTime)} – ${displayTime(endTime)}`
-                  : startTime
-                    ? `${displayTime(startTime)} – `
-                    : ''
-              }
-              onClick={() => setOpen(true)}
+              value={fieldText}
+              onClick={openPicker}
               onKeyDown={openOnKey}
-              error={Boolean(fieldState.error)}
-              helperText={fieldState.error?.message ?? (hasRange ? formatHours(hours) : undefined)}
+              error={Boolean(errorMessage)}
+              helperText={errorMessage ?? rangeLength}
               slotProps={{
-                inputLabel: { shrink: open || startTime !== '' || undefined },
+                inputLabel: { shrink: shrinkLabel },
                 input: {
                   readOnly: true,
                   className: 'cursor-pointer',
@@ -115,18 +125,18 @@ export function WebServiceTimeField({ control }: WebServiceTimeFieldProps) {
               <div className="flex">
                 <MenuList
                   aria-label="Start time"
-                  autoFocusItem={startTime === ''}
+                  autoFocusItem={!hasStart}
                   className="max-h-72 w-40 overflow-y-auto"
                   subheader={<ListSubheader>Start</ListSubheader>}
                 >
-                  {START_TIMES.map((time) => (
+                  {startOptions.map((option) => (
                     <MenuItem
-                      key={time}
-                      selected={time === startTime}
-                      disabled={hasStartPassed(serviceDate, time)} // on today's date
-                      onClick={() => pickStart(time)}
+                      key={option.time}
+                      selected={option.selected}
+                      disabled={option.disabled}
+                      onClick={() => pickStart(option.time)}
                     >
-                      {displayTime(time)}
+                      {option.label}
                     </MenuItem>
                   ))}
                 </MenuList>
@@ -136,20 +146,20 @@ export function WebServiceTimeField({ control }: WebServiceTimeFieldProps) {
                   className="max-h-72 w-48 overflow-y-auto border-0 border-l border-solid border-outline-variant"
                   subheader={<ListSubheader>End</ListSubheader>}
                 >
-                  {startTime === '' ? (
+                  {!hasStart ? (
                     <li className="px-md py-sm text-body-small text-on-surface-variant">
                       Choose a start time first
                     </li>
                   ) : (
-                    endTimeOptions(startTime).map((time) => (
+                    endOptions.map((option) => (
                       <MenuItem
-                        key={time}
-                        selected={time === endTime}
-                        onClick={() => pickEnd(time)}
+                        key={option.time}
+                        selected={option.selected}
+                        onClick={() => pickEnd(option.time)}
                       >
-                        {displayTime(time)}
+                        {option.label}
                         <span className="ml-sm text-body-small text-on-surface-variant">
-                          {formatHours(hoursBetween(startTime, time))}
+                          {option.length}
                         </span>
                       </MenuItem>
                     ))

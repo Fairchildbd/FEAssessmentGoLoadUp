@@ -1,7 +1,5 @@
 import type { Page } from '@playwright/test';
 
-/** Steps for filling in the booking form, shared by the E2E tests. */
-
 export const submitButton = (page: Page) => page.getByRole('button', { name: 'Request a sitter' });
 
 export async function pickTime(page: Page, start: string, end: string) {
@@ -16,7 +14,6 @@ export async function pickTime(page: Page, start: string, end: string) {
     .click();
 }
 
-/** Opens the date picker labelled `label` and clicks a day of the month it shows. */
 export async function pickDate(page: Page, day: string, label = 'Date') {
   await page.getByRole('group', { name: label }).click();
   await page.getByRole('gridcell', { name: day, exact: true }).click();

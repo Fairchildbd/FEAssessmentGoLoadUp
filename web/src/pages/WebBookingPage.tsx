@@ -5,30 +5,28 @@ import CardContent from '@mui/material/CardContent';
 import Container from '@mui/material/Container';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { useBookingForm, type BookingRequest } from '@pet-sitting/shared/booking-form';
+import {
+  useBookingForm,
+  type BookingFormValues,
+  type BookingRequest,
+} from '@pet-sitting/shared/booking-form';
 import { getDeviceTimeZone } from '@pet-sitting/shared/date-time';
 import { createBooking, MockApiError } from '@pet-sitting/shared/mock-api';
 import { formatNameList } from '@pet-sitting/shared/domain';
 import { mockDatabase } from '@pet-sitting/shared/mock-database';
 import { useState, type ReactNode } from 'react';
-import { Controller } from 'react-hook-form';
+import { Controller, type Control } from 'react-hook-form';
 import { Link } from 'react-router';
 import { WebPetFields } from '../booking-form/WebPetFields';
 import { WebPriceSummary } from '../booking-form/WebPriceSummary';
 import { WebServiceDateField } from '../booking-form/WebServiceDateField';
 import { WebServiceTimeField } from '../booking-form/WebServiceTimeField';
 
-// The rate card from the mock database's seed, read directly for the live price. Bookings are saved
-// through the mock API, which prices them from the same rate card.
 const { pricingRules } = mockDatabase;
 
-/** The booking form: who you are, your pets, when, and the live price. Validation is all client-side. */
 export function WebBookingPage() {
   const { control, handleSubmit, formState, reset, setError, pets } = useBookingForm();
   const [submitted, setSubmitted] = useState<BookingRequest | null>(null);
-
-  // Submit stays disabled until every input is filled in and valid. isValid runs the schema on
-  // every change, while each field's error message still waits until the user leaves it.
 
   const onSubmit = async (request: BookingRequest) => {
     setSubmitted(null);
@@ -37,13 +35,17 @@ export function WebBookingPage() {
       setSubmitted(request);
       reset();
     } catch (error) {
-      // The server refused it (say, a pet is already booked then). Keep the form so it can be fixed.
       const message =
         error instanceof MockApiError ? error.message : 'Something went wrong. Please try again.';
       setError('root.server', { message });
     }
   };
   const serverError = formState.errors.root?.server?.message;
+  const submitButtonText = formState.isSubmitting ? 'Booking…' : 'Request a sitter';
+  const isSubmitDisabled = !formState.isValid || formState.isSubmitting;
+  const bookedPetNames = submitted ? formatNameList(submitted.pets.map((pet) => pet.name)) : '';
+  const bookedDayLink = submitted ? `/admin?date=${submitted.serviceDate}` : '';
+  const dismissSuccess = () => setSubmitted(null);
 
   return (
     <Container component="main" maxWidth="sm" className="py-xl">
@@ -55,9 +57,8 @@ export function WebBookingPage() {
       </Typography>
 
       {submitted && (
-        <Alert severity="success" onClose={() => setSubmitted(null)} className="mt-lg">
-          Booked {formatNameList(submitted.pets.map((pet) => pet.name))}.{' '}
-          <Link to={`/admin?date=${submitted.serviceDate}`}>See the day's bookings</Link>
+        <Alert severity="success" onClose={dismissSuccess} className="mt-lg">
+          Booked {bookedPetNames}. <Link to={bookedDayLink}>See the day's bookings</Link>
         </Alert>
       )}
 
@@ -71,33 +72,17 @@ export function WebBookingPage() {
           >
             <FormSection title="Your name">
               <div className="grid gap-md sm:grid-cols-2">
-                <Controller
+                <NameField
+                  control={control}
                   name="firstName"
-                  control={control}
-                  render={({ field, fieldState }) => (
-                    <TextField
-                      {...field}
-                      inputRef={field.ref}
-                      label="First name"
-                      autoComplete="given-name"
-                      error={Boolean(fieldState.error)}
-                      helperText={fieldState.error?.message}
-                    />
-                  )}
+                  label="First name"
+                  autoComplete="given-name"
                 />
-                <Controller
-                  name="lastName"
+                <NameField
                   control={control}
-                  render={({ field, fieldState }) => (
-                    <TextField
-                      {...field}
-                      inputRef={field.ref}
-                      label="Last name"
-                      autoComplete="family-name"
-                      error={Boolean(fieldState.error)}
-                      helperText={fieldState.error?.message}
-                    />
-                  )}
+                  name="lastName"
+                  label="Last name"
+                  autoComplete="family-name"
                 />
               </div>
             </FormSection>
@@ -121,10 +106,10 @@ export function WebBookingPage() {
               type="submit"
               variant="contained"
               size="large"
-              disabled={!formState.isValid || formState.isSubmitting}
+              disabled={isSubmitDisabled}
               className="rounded-pill"
             >
-              {formState.isSubmitting ? 'Booking…' : 'Request a sitter'}
+              {submitButtonText}
             </Button>
           </form>
         </CardContent>
@@ -141,5 +126,34 @@ function FormSection({ title, children }: { title: string; children: ReactNode }
       </Typography>
       {children}
     </fieldset>
+  );
+}
+
+interface NameFieldProps {
+  control: Control<BookingFormValues, unknown, BookingRequest>;
+  name: 'firstName' | 'lastName';
+  label: string;
+  autoComplete: string;
+}
+
+function NameField({ control, name, label, autoComplete }: NameFieldProps) {
+  return (
+    <Controller
+      name={name}
+      control={control}
+      render={({ field, fieldState }) => {
+        const errorMessage = fieldState.error?.message;
+        return (
+          <TextField
+            {...field}
+            inputRef={field.ref}
+            label={label}
+            autoComplete={autoComplete}
+            error={Boolean(errorMessage)}
+            helperText={errorMessage}
+          />
+        );
+      }}
+    />
   );
 }

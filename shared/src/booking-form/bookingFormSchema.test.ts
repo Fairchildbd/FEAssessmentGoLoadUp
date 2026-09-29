@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { bookingFormSchema, type BookingFormValues } from './bookingFormSchema';
 
-// "Now" is 1 Oct 2026 at 12:00 in the device's time zone, so date and time checks are repeatable.
 beforeEach(() => {
   vi.useFakeTimers();
   vi.setSystemTime(new Date(2026, 9, 1, 12, 0));
@@ -27,7 +26,6 @@ const at = (startTime: string, endTime: string): BookingFormValues => ({
   serviceTime: { startTime, endTime },
 });
 
-/** The first error message for each field path, which is what React Hook Form shows. */
 function errorsFor(values: BookingFormValues): Record<string, string> {
   const result = bookingFormSchema.safeParse(values);
   const errors: Record<string, string> = {};
@@ -86,7 +84,7 @@ describe('bookingFormSchema', () => {
     expect(errorsFor(at('09:00', '11:00'))).toEqual({});
     expect(errorsFor(at('09:00', '10:00'))).toEqual({ serviceTime: 'Book at least 2 hours' });
     expect(errorsFor(at('09:00', '18:00'))).toEqual({ serviceTime: 'Book at most 8 hours' });
-    expect(errorsFor(at('09:00', '11:30'))).toEqual({}); // half hours are fine
+    expect(errorsFor(at('09:00', '11:30'))).toEqual({});
     expect(errorsFor(at('12:00', '09:00'))).toEqual({ serviceTime: 'End after the start time' });
   });
 

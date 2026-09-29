@@ -23,93 +23,116 @@ const segmentTheme = {
   colors: { secondaryContainer: color.primary, onSecondaryContainer: color.onPrimary },
 };
 
+type FormControl = Control<BookingFormValues, unknown, BookingRequest>;
+
 interface MobilePetFieldsProps {
-  control: Control<BookingFormValues, unknown, BookingRequest>;
+  control: FormControl;
   pets: ReturnType<typeof useBookingForm>['pets'];
 }
 
-/**
- * One block per pet (name and animal type), plus a button to add another pet to the request. On a
- * phone the three animal types fit as segmented buttons, which take one tap instead of a menu.
- */
 export function MobilePetFields({ control, pets }: MobilePetFieldsProps) {
   const petValues = useWatch({ control, name: 'pets' });
-  const onlyOnePet = pets.fields.length === 1;
+  const canRemovePets = pets.fields.length > 1;
+  const addPet = () => pets.append(emptyPet);
 
   return (
     <View style={styles.list}>
-      {pets.fields.map((pet, index) => {
-        const petName = petValues[index]?.name.trim() || `Pet ${index + 1}`;
-        return (
-          <View key={pet.id} style={styles.pet} accessibilityLabel={`Pet ${index + 1}`}>
-            <View style={styles.petHeader}>
-              <Text variant="labelLarge">Pet {index + 1}</Text>
-              {!onlyOnePet && (
-                <IconButton
-                  icon="delete-outline"
-                  accessibilityLabel={`Remove ${petName}`}
-                  onPress={() => pets.remove(index)}
-                  style={styles.remove}
-                />
-              )}
-            </View>
+      {pets.fields.map((pet, index) => (
+        <MobilePetRow
+          key={pet.id}
+          control={control}
+          index={index}
+          enteredName={petValues[index]?.name ?? ''}
+          canRemove={canRemovePets}
+          removePet={pets.remove}
+        />
+      ))}
 
-            <Controller
-              name={`pets.${index}.name`}
-              control={control}
-              render={({ field, fieldState }) => (
-                <View>
-                  <TextInput
-                    mode="outlined"
-                    label="Pet's name"
-                    accessibilityLabel={`Pet ${index + 1} name`}
-                    value={field.value}
-                    onChangeText={field.onChange}
-                    onBlur={field.onBlur}
-                    ref={field.ref}
-                    autoCorrect={false}
-                    error={Boolean(fieldState.error)}
-                  />
-                  {fieldState.error ? (
-                    <HelperText type="error">{fieldState.error.message}</HelperText>
-                  ) : null}
-                </View>
-              )}
-            />
-
-            <Controller
-              name={`pets.${index}.animalType`}
-              control={control}
-              render={({ field, fieldState }) => (
-                <View>
-                  <SegmentedButtons
-                    value={field.value ?? ''}
-                    // Paper fills the chosen segment with secondaryContainer (the lime accent);
-                    // use the primary green instead, as everywhere else a choice is highlighted.
-                    theme={segmentTheme}
-                    onValueChange={(value) => {
-                      field.onChange(value as AnimalType);
-                      field.onBlur(); // a tap is a finished choice
-                    }}
-                    buttons={ANIMAL_TYPES.map((type) => ({
-                      value: type,
-                      label: ANIMAL_TYPE_LABELS[type],
-                      accessibilityLabel: `Pet ${index + 1} ${ANIMAL_TYPE_LABELS[type]}`,
-                    }))}
-                  />
-                  {fieldState.error ? (
-                    <HelperText type="error">{fieldState.error.message}</HelperText>
-                  ) : null}
-                </View>
-              )}
-            />
-          </View>
-        );
-      })}
-
-      <Button mode="outlined" icon="plus" onPress={() => pets.append(emptyPet)} style={styles.add}>
+      <Button mode="outlined" icon="plus" onPress={addPet} style={styles.add}>
         Add another pet
       </Button>
+    </View>
+  );
+}
+
+interface MobilePetRowProps {
+  control: FormControl;
+  index: number;
+  enteredName: string;
+  canRemove: boolean;
+  removePet: (index: number) => void;
+}
+
+function MobilePetRow({ control, index, enteredName, canRemove, removePet }: MobilePetRowProps) {
+  const petLabel = `Pet ${index + 1}`;
+  const removeLabel = `Remove ${enteredName.trim() || petLabel}`;
+  const removeThisPet = () => removePet(index);
+  const animalTypeButtons = ANIMAL_TYPES.map((type) => ({
+    value: type,
+    label: ANIMAL_TYPE_LABELS[type],
+    accessibilityLabel: `${petLabel} ${ANIMAL_TYPE_LABELS[type]}`,
+  }));
+
+  return (
+    <View style={styles.pet} accessibilityLabel={petLabel}>
+      <View style={styles.petHeader}>
+        <Text variant="labelLarge">{petLabel}</Text>
+        {canRemove && (
+          <IconButton
+            icon="delete-outline"
+            accessibilityLabel={removeLabel}
+            onPress={removeThisPet}
+            style={styles.remove}
+          />
+        )}
+      </View>
+
+      <Controller
+        name={`pets.${index}.name`}
+        control={control}
+        render={({ field, fieldState }) => {
+          const errorMessage = fieldState.error?.message;
+          return (
+            <View>
+              <TextInput
+                mode="outlined"
+                label="Pet's name"
+                accessibilityLabel={`${petLabel} name`}
+                value={field.value}
+                onChangeText={field.onChange}
+                onBlur={field.onBlur}
+                ref={field.ref}
+                autoCorrect={false}
+                error={Boolean(errorMessage)}
+              />
+              {errorMessage ? <HelperText type="error">{errorMessage}</HelperText> : null}
+            </View>
+          );
+        }}
+      />
+
+      <Controller
+        name={`pets.${index}.animalType`}
+        control={control}
+        render={({ field, fieldState }) => {
+          const errorMessage = fieldState.error?.message;
+          const chooseAnimalType = (value: string) => {
+            field.onChange(value as AnimalType);
+            field.onBlur();
+          };
+          return (
+            <View>
+              <SegmentedButtons
+                value={field.value ?? ''}
+                theme={segmentTheme}
+                onValueChange={chooseAnimalType}
+                buttons={animalTypeButtons}
+              />
+              {errorMessage ? <HelperText type="error">{errorMessage}</HelperText> : null}
+            </View>
+          );
+        }}
+      />
     </View>
   );
 }

@@ -8,20 +8,13 @@ const { color } = designTokens;
 
 interface MobileFullScreenModalProps {
   visible: boolean;
-  /** What the modal is for, read out by screen readers. */
   accessibilityLabel: string;
-  /** Close without saving (the X, or Android's back button). */
   onDismiss: () => void;
   onSave: () => void;
   saveDisabled?: boolean;
   children: ReactNode;
 }
 
-/**
- * The full-screen picker the booking form's date and time fields open: a close (X) button and Save
- * across the top, the picker below. Both pickers share it, so they feel the same. Choices inside
- * are a draft until Save.
- */
 export function MobileFullScreenModal({
   visible,
   accessibilityLabel,
@@ -37,7 +30,6 @@ export function MobileFullScreenModal({
       presentationStyle="fullScreen"
       onRequestClose={onDismiss}
     >
-      {/* A modal is a new native window, so it needs its own safe-area measurements. */}
       <SafeAreaProvider>
         <SafeAreaView style={styles.screen} accessibilityLabel={accessibilityLabel}>
           <Appbar style={styles.header}>

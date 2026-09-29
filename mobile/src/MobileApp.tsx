@@ -12,7 +12,6 @@ import { mobileTheme } from './theme/mobileTheme';
 
 const { color } = designTokens;
 
-// accessibilityLabel names each tab for screen readers (Paper doesn't reuse the title).
 const ROUTES = [
   {
     key: 'book',
@@ -28,53 +27,50 @@ const ROUTES = [
   },
 ];
 
-/**
- * Root of the mobile app: platform providers and two tabs, the booking form and the admin schedule,
- * like the web app's nav bar. Paper's BottomNavigation keeps both tabs mounted, so a half-filled
- * form survives a look at the schedule.
- */
+type TabRoute = (typeof ROUTES)[number];
+
+const ADMIN_TAB_INDEX = ROUTES.findIndex((route) => route.key === 'admin');
+
 export function MobileApp() {
   const [index, setIndex] = useState(0);
-  // The admin tab's day lives here, so the booking screen can open the day it just booked.
   const [adminDate, setAdminDate] = useState(() => format(new Date(), DATE_FORMAT));
-  // Bumped each time the admin tab opens, which remounts it so it loads the latest bookings.
-  const [adminVisit, setAdminVisit] = useState(0);
+  const [adminTabOpenCount, setAdminTabOpenCount] = useState(0);
 
   const changeTab = (next: number) => {
-    if (ROUTES[next]?.key === 'admin') setAdminVisit((visit) => visit + 1);
+    if (next === ADMIN_TAB_INDEX) setAdminTabOpenCount((count) => count + 1);
     setIndex(next);
   };
+  const showDayInAdmin = (date: string) => {
+    setAdminDate(date);
+    changeTab(ADMIN_TAB_INDEX);
+  };
+  const navigationState = { index, routes: ROUTES };
+
+  const renderLabel = ({ route }: { route: TabRoute }) => (
+    <Text variant="labelMedium" style={styles.tabLabel}>
+      {route.title}
+    </Text>
+  );
+  const renderScene = ({ route }: { route: TabRoute }) =>
+    route.key === 'book' ? (
+      <MobileBookingScreen onShowDay={showDayInAdmin} />
+    ) : (
+      <MobileAdminScreen key={adminTabOpenCount} date={adminDate} onDateChange={setAdminDate} />
+    );
 
   return (
     <SafeAreaProvider>
       <PaperProvider theme={mobileTheme}>
         <SafeAreaView style={styles.root} edges={['top']}>
           <BottomNavigation
-            navigationState={{ index, routes: ROUTES }}
+            navigationState={navigationState}
             onIndexChange={changeTab}
-            // The web header's colors: the primary green, and a soft gray pill for the current tab.
             barStyle={styles.tabBar}
             activeIndicatorStyle={styles.tabIndicator}
-            activeColor={color.onNavigationIndicator} // the icon, on the gray pill
+            activeColor={color.onNavigationIndicator}
             inactiveColor={color.onNavigationBar}
-            // Labels sit on the green bar under the pill, so they stay white either way.
-            renderLabel={({ route }) => (
-              <Text variant="labelMedium" style={styles.tabLabel}>
-                {route.title}
-              </Text>
-            )}
-            renderScene={({ route }) =>
-              route.key === 'book' ? (
-                <MobileBookingScreen
-                  onShowDay={(date) => {
-                    setAdminDate(date);
-                    changeTab(1);
-                  }}
-                />
-              ) : (
-                <MobileAdminScreen key={adminVisit} date={adminDate} onDateChange={setAdminDate} />
-              )
-            }
+            renderLabel={renderLabel}
+            renderScene={renderScene}
           />
         </SafeAreaView>
         <StatusBar style="dark" />

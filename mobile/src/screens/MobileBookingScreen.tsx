@@ -1,11 +1,15 @@
-import { useBookingForm, type BookingRequest } from '@pet-sitting/shared/booking-form';
+import {
+  useBookingForm,
+  type BookingFormValues,
+  type BookingRequest,
+} from '@pet-sitting/shared/booking-form';
 import { getDeviceTimeZone } from '@pet-sitting/shared/date-time';
 import { designTokens } from '@pet-sitting/shared/design-tokens';
 import { createBooking, MockApiError } from '@pet-sitting/shared/mock-api';
 import { formatNameList } from '@pet-sitting/shared/domain';
 import { mockDatabase } from '@pet-sitting/shared/mock-database';
 import { useState, type ReactNode } from 'react';
-import { Controller } from 'react-hook-form';
+import { Controller, type Control } from 'react-hook-form';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { Banner, Button, Card, HelperText, Text, TextInput } from 'react-native-paper';
 import { MobilePetFields } from '../booking-form/MobilePetFields';
@@ -15,19 +19,12 @@ import { MobileServiceTimeField } from '../booking-form/MobileServiceTimeField';
 
 const { color, spacing } = designTokens;
 
-// The rate card from the mock database's seed, read directly for the live price. Bookings are saved
-// through the mock API, which prices them from the same rate card.
 const { pricingRules } = mockDatabase;
 
 interface MobileBookingScreenProps {
-  /** Opens the admin tab on a date ('YYYY-MM-DD'). */
   onShowDay: (serviceDate: string) => void;
 }
 
-/**
- * The booking form, matching the web page: your name, your pets, when, and the live price, with the
- * same shared hook, rules and mock API. Validation is all on the device.
- */
 export function MobileBookingScreen({ onShowDay }: MobileBookingScreenProps) {
   const { control, handleSubmit, formState, reset, setError, pets } = useBookingForm();
   const [submitted, setSubmitted] = useState<BookingRequest | null>(null);
@@ -39,19 +36,31 @@ export function MobileBookingScreen({ onShowDay }: MobileBookingScreenProps) {
       setSubmitted(request);
       reset();
     } catch (error) {
-      // The server refused it (say, a pet is already booked then). Keep the form so it can be fixed.
       const message =
         error instanceof MockApiError ? error.message : 'Something went wrong. Please try again.';
       setError('root.server', { message });
     }
   };
   const serverError = formState.errors.root?.server?.message;
+  const submitButtonText = formState.isSubmitting ? 'Booking…' : 'Request a sitter';
+  const isSubmitDisabled = !formState.isValid || formState.isSubmitting;
+  const keyboardBehavior = Platform.OS === 'ios' ? 'padding' : undefined;
+  const isBooked = submitted !== null;
+  const bookedMessage = submitted
+    ? `Booked ${formatNameList(submitted.pets.map((pet) => pet.name))}.`
+    : '';
+  const dismissSuccess = () => setSubmitted(null);
+  const showBookedDay = () => {
+    if (submitted) onShowDay(submitted.serviceDate);
+    dismissSuccess();
+  };
+  const bannerActions = [
+    { label: 'Dismiss', onPress: dismissSuccess },
+    { label: "See the day's bookings", onPress: showBookedDay },
+  ];
 
   return (
-    <KeyboardAvoidingView
-      style={styles.screen}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <KeyboardAvoidingView style={styles.screen} behavior={keyboardBehavior}>
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text variant="headlineMedium" accessibilityRole="header">
           Book a pet sitter
@@ -60,71 +69,26 @@ export function MobileBookingScreen({ onShowDay }: MobileBookingScreenProps) {
           Add each pet you&apos;d like sat, then choose a date and time.
         </Text>
 
-        <Banner
-          visible={submitted !== null}
-          icon="check-circle-outline"
-          actions={[
-            { label: 'Dismiss', onPress: () => setSubmitted(null) },
-            {
-              label: "See the day's bookings",
-              onPress: () => {
-                if (submitted) onShowDay(submitted.serviceDate);
-                setSubmitted(null);
-              },
-            },
-          ]}
-        >
-          {submitted ? `Booked ${formatNameList(submitted.pets.map((pet) => pet.name))}.` : ''}
+        <Banner visible={isBooked} icon="check-circle-outline" actions={bannerActions}>
+          {bookedMessage}
         </Banner>
 
         <Card mode="outlined">
           <Card.Content style={styles.form}>
             <Section title="Your name">
-              <Controller
+              <NameField
+                control={control}
                 name="firstName"
-                control={control}
-                render={({ field, fieldState }) => (
-                  <View>
-                    <TextInput
-                      mode="outlined"
-                      label="First name"
-                      accessibilityLabel="First name"
-                      value={field.value}
-                      onChangeText={field.onChange}
-                      onBlur={field.onBlur}
-                      ref={field.ref}
-                      autoComplete="given-name"
-                      textContentType="givenName"
-                      error={Boolean(fieldState.error)}
-                    />
-                    {fieldState.error ? (
-                      <HelperText type="error">{fieldState.error.message}</HelperText>
-                    ) : null}
-                  </View>
-                )}
+                label="First name"
+                autoComplete="given-name"
+                textContentType="givenName"
               />
-              <Controller
-                name="lastName"
+              <NameField
                 control={control}
-                render={({ field, fieldState }) => (
-                  <View>
-                    <TextInput
-                      mode="outlined"
-                      label="Last name"
-                      accessibilityLabel="Last name"
-                      value={field.value}
-                      onChangeText={field.onChange}
-                      onBlur={field.onBlur}
-                      ref={field.ref}
-                      autoComplete="family-name"
-                      textContentType="familyName"
-                      error={Boolean(fieldState.error)}
-                    />
-                    {fieldState.error ? (
-                      <HelperText type="error">{fieldState.error.message}</HelperText>
-                    ) : null}
-                  </View>
-                )}
+                name="lastName"
+                label="Last name"
+                autoComplete="family-name"
+                textContentType="familyName"
               />
             </Section>
 
@@ -145,20 +109,56 @@ export function MobileBookingScreen({ onShowDay }: MobileBookingScreenProps) {
               </HelperText>
             ) : null}
 
-            {/* Disabled until every input is filled in and valid, as on web. */}
             <Button
               mode="contained"
               onPress={handleSubmit(onSubmit)}
-              disabled={!formState.isValid || formState.isSubmitting}
+              disabled={isSubmitDisabled}
               loading={formState.isSubmitting}
               contentStyle={styles.submit}
             >
-              {formState.isSubmitting ? 'Booking…' : 'Request a sitter'}
+              {submitButtonText}
             </Button>
           </Card.Content>
         </Card>
       </ScrollView>
     </KeyboardAvoidingView>
+  );
+}
+
+interface NameFieldProps {
+  control: Control<BookingFormValues, unknown, BookingRequest>;
+  name: 'firstName' | 'lastName';
+  label: string;
+  autoComplete: 'given-name' | 'family-name';
+  textContentType: 'givenName' | 'familyName';
+}
+
+function NameField({ control, name, label, autoComplete, textContentType }: NameFieldProps) {
+  return (
+    <Controller
+      name={name}
+      control={control}
+      render={({ field, fieldState }) => {
+        const errorMessage = fieldState.error?.message;
+        return (
+          <View>
+            <TextInput
+              mode="outlined"
+              label={label}
+              accessibilityLabel={label}
+              value={field.value}
+              onChangeText={field.onChange}
+              onBlur={field.onBlur}
+              ref={field.ref}
+              autoComplete={autoComplete}
+              textContentType={textContentType}
+              error={Boolean(errorMessage)}
+            />
+            {errorMessage ? <HelperText type="error">{errorMessage}</HelperText> : null}
+          </View>
+        );
+      }}
+    />
   );
 }
 

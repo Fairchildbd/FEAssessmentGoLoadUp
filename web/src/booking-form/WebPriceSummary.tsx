@@ -4,10 +4,11 @@ import {
   useBookingQuote,
   type BookingFormValues,
   type BookingRequest,
+  type PetFormValues,
 } from '@pet-sitting/shared/booking-form';
-import { ANIMAL_TYPE_LABELS, type PricingRules } from '@pet-sitting/shared/domain';
 import { formatHours } from '@pet-sitting/shared/date-time';
-import { formatCents } from '@pet-sitting/shared/pricing';
+import { ANIMAL_TYPE_LABELS, type PricingRules } from '@pet-sitting/shared/domain';
+import { formatCents, type PetQuote } from '@pet-sitting/shared/pricing';
 import { useWatch, type Control } from 'react-hook-form';
 
 interface WebPriceSummaryProps {
@@ -15,13 +16,11 @@ interface WebPriceSummaryProps {
   pricingRules: PricingRules;
 }
 
-/**
- * The itemized price: each pet with its hours and hourly rate listed under its name, the base
- * charge once for the whole request, and the total. It updates as pets and times change.
- */
 export function WebPriceSummary({ control, pricingRules }: WebPriceSummaryProps) {
   const pets = useWatch({ control, name: 'pets' });
   const quote = useBookingQuote(control, pricingRules);
+  const baseCharge = formatCents(pricingRules.baseChargeCents);
+  const total = formatCents(quote.totalCents);
 
   return (
     <section aria-labelledby="price-heading" className="flex flex-col gap-sm">
@@ -30,42 +29,22 @@ export function WebPriceSummary({ control, pricingRules }: WebPriceSummaryProps)
       </Typography>
 
       <ul className="m-0 flex list-none flex-col gap-sm p-0">
-        {pets.map((pet, index) => {
-          const petQuote = quote.pets[index];
-          const name = pet.name.trim() || `Pet ${index + 1}`;
-          const type = pet.animalType ? ANIMAL_TYPE_LABELS[pet.animalType] : null;
-
-          return (
-            <li key={index} aria-label={`${name} price`} className="flex justify-between gap-md">
-              <div>
-                <Typography className="font-medium">
-                  {name}
-                  {type && <span className="text-on-surface-variant"> ({type})</span>}
-                </Typography>
-                <div className="text-body-small text-on-surface-variant">
-                  {!pet.animalType ? (
-                    <div>Choose an animal type</div>
-                  ) : (
-                    <>
-                      <div>{petQuote ? formatHours(petQuote.hours) : 'Choose a time'}</div>
-                      <div>
-                        {formatCents(pricingRules.hourlyRateCents[pet.animalType])} per hour
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-              {petQuote && <Typography>{formatCents(petQuote.subtotalCents)}</Typography>}
-            </li>
-          );
-        })}
+        {pets.map((pet, index) => (
+          <PetPriceRow
+            key={index}
+            pet={pet}
+            fallbackName={`Pet ${index + 1}`}
+            petQuote={quote.pets[index]}
+            pricingRules={pricingRules}
+          />
+        ))}
 
         <li className="flex justify-between gap-md">
           <div>
             <Typography className="font-medium">Base charge</Typography>
             <div className="text-body-small text-on-surface-variant">Once per request</div>
           </div>
-          <Typography>{formatCents(pricingRules.baseChargeCents)}</Typography>
+          <Typography>{baseCharge}</Typography>
         </li>
       </ul>
 
@@ -76,9 +55,49 @@ export function WebPriceSummary({ control, pricingRules }: WebPriceSummaryProps)
           Total
         </Typography>
         <Typography variant="h6" component="p" data-testid="total-price">
-          {formatCents(quote.totalCents)}
+          {total}
         </Typography>
       </div>
     </section>
+  );
+}
+
+interface PetPriceRowProps {
+  pet: PetFormValues;
+  fallbackName: string;
+  petQuote: PetQuote | null | undefined;
+  pricingRules: PricingRules;
+}
+
+function PetPriceRow({ pet, fallbackName, petQuote, pricingRules }: PetPriceRowProps) {
+  const name = pet.name.trim() || fallbackName;
+  const animalType = pet.animalType;
+  const animalLabel = animalType ? ` (${ANIMAL_TYPE_LABELS[animalType]})` : '';
+  const hoursText = petQuote ? formatHours(petQuote.hours) : 'Choose a time';
+  const hourlyRate = animalType
+    ? `${formatCents(pricingRules.hourlyRateCents[animalType])} per hour`
+    : '';
+  const subtotal = petQuote ? formatCents(petQuote.subtotalCents) : null;
+
+  return (
+    <li aria-label={`${name} price`} className="flex justify-between gap-md">
+      <div>
+        <Typography className="font-medium">
+          {name}
+          {animalLabel && <span className="text-on-surface-variant">{animalLabel}</span>}
+        </Typography>
+        <div className="text-body-small text-on-surface-variant">
+          {animalType ? (
+            <>
+              <div>{hoursText}</div>
+              <div>{hourlyRate}</div>
+            </>
+          ) : (
+            <div>Choose an animal type</div>
+          )}
+        </div>
+      </div>
+      {subtotal && <Typography>{subtotal}</Typography>}
+    </li>
   );
 }

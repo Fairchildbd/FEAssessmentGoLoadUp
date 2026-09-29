@@ -11,89 +11,113 @@ import {
   type useBookingForm,
 } from '@pet-sitting/shared/booking-form';
 import { ANIMAL_TYPE_LABELS, ANIMAL_TYPES, type AnimalType } from '@pet-sitting/shared/domain';
+import type { ChangeEvent } from 'react';
 import { Controller, useWatch, type Control } from 'react-hook-form';
 
+type FormControl = Control<BookingFormValues, unknown, BookingRequest>;
+
 interface WebPetFieldsProps {
-  control: Control<BookingFormValues, unknown, BookingRequest>;
+  control: FormControl;
   pets: ReturnType<typeof useBookingForm>['pets'];
 }
 
-/** One row per pet (name and animal type), plus a button to add another pet to the request. */
 export function WebPetFields({ control, pets }: WebPetFieldsProps) {
   const petValues = useWatch({ control, name: 'pets' });
-  const onlyOnePet = pets.fields.length === 1;
+  const canRemovePets = pets.fields.length > 1;
+  const addPet = () => pets.append(emptyPet);
 
   return (
     <div className="flex flex-col gap-md">
-      {pets.fields.map((pet, index) => {
-        const petName = petValues[index]?.name.trim() || `Pet ${index + 1}`;
-        return (
-          <div
-            key={pet.id}
-            role="group"
-            aria-label={`Pet ${index + 1}`}
-            className="flex items-start gap-sm"
-          >
-            <div className="grid flex-1 gap-md sm:grid-cols-2">
-              <Controller
-                name={`pets.${index}.name`}
-                control={control}
-                render={({ field, fieldState }) => (
-                  <TextField
-                    {...field}
-                    inputRef={field.ref}
-                    label="Pet's name"
-                    autoComplete="off"
-                    error={Boolean(fieldState.error)}
-                    helperText={fieldState.error?.message}
-                  />
-                )}
-              />
-              <Controller
-                name={`pets.${index}.animalType`}
-                control={control}
-                render={({ field, fieldState }) => (
-                  <TextField
-                    select
-                    name={field.name}
-                    inputRef={field.ref}
-                    label="Animal type"
-                    value={field.value ?? ''}
-                    onChange={(event) => field.onChange(event.target.value as AnimalType)}
-                    onBlur={field.onBlur}
-                    error={Boolean(fieldState.error)}
-                    helperText={fieldState.error?.message}
-                  >
-                    {ANIMAL_TYPES.map((type) => (
-                      <MenuItem key={type} value={type}>
-                        {ANIMAL_TYPE_LABELS[type]}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                )}
-              />
-            </div>
-            {!onlyOnePet && (
-              <IconButton
-                aria-label={`Remove ${petName}`}
-                onClick={() => pets.remove(index)}
-                className="mt-sm"
-              >
-                <DeleteOutlinedIcon />
-              </IconButton>
-            )}
-          </div>
-        );
-      })}
+      {pets.fields.map((pet, index) => (
+        <WebPetRow
+          key={pet.id}
+          control={control}
+          index={index}
+          enteredName={petValues[index]?.name ?? ''}
+          canRemove={canRemovePets}
+          removePet={pets.remove}
+        />
+      ))}
 
       <Button
         variant="outlined"
         startIcon={<AddIcon />}
-        onClick={() => pets.append(emptyPet)}
+        onClick={addPet}
         className="self-start rounded-pill"
       >
         Add another pet
       </Button>
+    </div>
+  );
+}
+
+interface WebPetRowProps {
+  control: FormControl;
+  index: number;
+  enteredName: string;
+  canRemove: boolean;
+  removePet: (index: number) => void;
+}
+
+function WebPetRow({ control, index, enteredName, canRemove, removePet }: WebPetRowProps) {
+  const petLabel = `Pet ${index + 1}`;
+  const removeLabel = `Remove ${enteredName.trim() || petLabel}`;
+  const removeThisPet = () => removePet(index);
+
+  return (
+    <div role="group" aria-label={petLabel} className="flex items-start gap-sm">
+      <div className="grid flex-1 gap-md sm:grid-cols-2">
+        <Controller
+          name={`pets.${index}.name`}
+          control={control}
+          render={({ field, fieldState }) => {
+            const errorMessage = fieldState.error?.message;
+            return (
+              <TextField
+                {...field}
+                inputRef={field.ref}
+                label="Pet's name"
+                autoComplete="off"
+                error={Boolean(errorMessage)}
+                helperText={errorMessage}
+              />
+            );
+          }}
+        />
+        <Controller
+          name={`pets.${index}.animalType`}
+          control={control}
+          render={({ field, fieldState }) => {
+            const errorMessage = fieldState.error?.message;
+            const chooseAnimalType = (event: ChangeEvent<HTMLInputElement>) =>
+              field.onChange(event.target.value as AnimalType);
+            return (
+              <TextField
+                select
+                name={field.name}
+                inputRef={field.ref}
+                label="Animal type"
+                value={field.value ?? ''}
+                onChange={chooseAnimalType}
+                onBlur={field.onBlur}
+                error={Boolean(errorMessage)}
+                helperText={errorMessage}
+              >
+                {ANIMAL_TYPES.map((type) => (
+                  <MenuItem key={type} value={type}>
+                    {ANIMAL_TYPE_LABELS[type]}
+                  </MenuItem>
+                ))}
+              </TextField>
+            );
+          }}
+        />
+      </div>
+      {canRemove && (
+        <IconButton aria-label={removeLabel} onClick={removeThisPet} className="mt-sm">
+          <DeleteOutlinedIcon />
+        </IconButton>
+      )}
     </div>
   );
 }

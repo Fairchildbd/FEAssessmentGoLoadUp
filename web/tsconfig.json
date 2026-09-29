@@ -2,7 +2,6 @@
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    // vite/client: types for CSS and asset imports. node: for the config files and Playwright.
     "types": ["vite/client", "node"]
   },
   "include": ["src", "e2e", "*.config.ts"]
